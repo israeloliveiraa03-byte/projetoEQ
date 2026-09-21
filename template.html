@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Escolas Quilombolas em Dados · CONAQ</title>
+<meta name="description" content="Painel do Coletivo de Educação da CONAQ sobre as escolas localizadas em comunidades quilombolas: mapa com camadas, indicadores de infraestrutura e cruzamento de variáveis a partir dos microdados do Censo Escolar (INEP).">
+<meta name="theme-color" content="#3B5D42">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+    :root{--verde:#3B5D42;--verde-escuro:#24382A;--dourado:#B9812F;--terracota:#A85630;--grafite:#2E271F;--texto:#4A4033;--medio:#8A7C68;--claro:#E4DAC6;--fundo:#F4EEDF;--branco:#FFF;--creme:#FBF6EA;--borda:#D9CBAC;--alerta-bg:#FBF0DC;--alerta-borda:#DCAE5C}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:'Inter',-apple-system,sans-serif;background:var(--creme);color:var(--texto);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+    .container{max-width:1280px;margin:0 auto;padding:0 32px}
+    .top-bar{background:var(--verde-escuro);color:rgba(255,255,255,.85);font-size:12px;letter-spacing:.04em;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+    .top-bar .container{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .top-bar strong{color:#fff;font-weight:600}
+    header.site-header{background:var(--branco);border-bottom:1px solid var(--claro);padding:40px 0 36px;position:relative;overflow:hidden}
+    .header-marca{display:flex;align-items:flex-start;gap:24px;border-left:4px solid var(--dourado);padding-left:24px}
+    .header-simbolo{width:56px;height:56px;background:var(--verde);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .header-simbolo svg{width:34px;height:34px}
+    .header-titulos h1{font-family:'Source Serif 4',Georgia,serif;font-size:30px;font-weight:700;color:var(--verde-escuro);line-height:1.2;letter-spacing:-.01em}
+    .subtitulo-nome{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dourado);margin-top:4px}
+    .header-titulos .subtitulo{font-family:'Source Serif 4',Georgia,serif;font-size:16px;color:var(--medio);margin-top:8px;max-width:760px}
+    .header-meta{margin-top:20px;padding-top:20px;border-top:1px solid var(--claro);font-size:13px;color:var(--medio);display:flex;gap:32px;flex-wrap:wrap}
+    .header-meta strong{color:var(--grafite);font-weight:600}
+    .motivo-raiz{position:absolute;inset:0;pointer-events:none;opacity:.08;z-index:0}
+    .motivo-raiz svg{width:100%;height:100%}
+    header.site-header .container{position:relative;z-index:1}
+    section.bloco{padding:48px 0;position:relative}
+    section.bloco::after{content:"";display:block;position:absolute;bottom:0;left:0;right:0;height:10px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M0,4 C10,9 20,0 30,5 C40,10 50,1 60,5 C70,9 80,0 90,5 C100,10 110,2 120,5 L120,10 L0,10 Z' fill='%23D9CBAC'/%3E%3C/svg%3E");background-repeat:repeat-x;background-size:120px 10px;opacity:.7}
+    section.bloco:last-of-type::after{display:none}
+    .secao-cabecalho{margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px}
+    .secao-cabecalho .rotulo{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dourado);margin-bottom:8px}
+    .secao-cabecalho h2{font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:600;color:var(--verde-escuro)}
+    .secao-cabecalho p.descricao{margin-top:10px;font-size:14px;color:var(--medio);max-width:760px}
+    .indicadores-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--claro);border:1px solid var(--claro)}
+    .indicador{background:var(--branco);padding:26px 22px}
+    .indicador .valor{font-family:'Source Serif 4',Georgia,serif;font-size:32px;font-weight:700;color:var(--verde);line-height:1}
+    .indicador .rotulo{margin-top:10px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--medio)}
+    .indicador .nota{margin-top:6px;font-size:12px;color:var(--medio);font-style:italic}
+    .filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:20px;align-items:end;padding:24px;background:var(--fundo);border:1px solid var(--claro)}
+    .campo{display:flex;flex-direction:column}
+    .campo label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--medio);margin-bottom:8px}
+    .campo select,.campo input{font-family:'Inter',sans-serif;font-size:14px;padding:10px 12px;border:1px solid var(--borda);background:var(--branco);color:var(--grafite);border-radius:0;outline:none}
+    .campo select:focus,.campo input:focus{border-color:var(--verde)}
+    .btn-primario,.btn-limpar{font-family:'Inter',sans-serif;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:11px 20px;cursor:pointer;border:1px solid var(--verde)}
+    .btn-limpar{background:transparent;color:var(--verde)}
+    .btn-limpar:hover{background:var(--verde);color:#fff}
+    .btn-primario{background:var(--verde);color:#fff}
+    .btn-primario:hover{background:var(--verde-escuro)}
+    .barra-acoes{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
+    .bloco-filtros{background:var(--fundo);border-top:1px solid var(--claro);border-bottom:1px solid var(--claro)}
+    .faixa-recorte{position:sticky;top:0;z-index:50;background:var(--verde-escuro);color:rgba(255,255,255,.92);font-size:12px;letter-spacing:.03em;text-align:center;padding:8px 16px}
+    .camadas-painel{display:flex;gap:20px;align-items:end;flex-wrap:wrap;margin-bottom:16px;padding:16px;background:var(--fundo);border:1px solid var(--claro)}
+    .mapa-wrapper{position:relative;height:560px;border:1px solid var(--claro);background:var(--fundo)}
+    #mapa{height:100%;width:100%}
+    .mapa-dica{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:400;background:rgba(36,56,42,.88);color:#fff;font-size:11px;padding:6px 12px;border-radius:2px;pointer-events:none;transition:opacity .4s;white-space:nowrap}
+    .mapa-legenda{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--medio)}
+    .mapa-legenda .item{display:flex;align-items:center;gap:6px}
+    .mapa-legenda .bolinha{width:12px;height:12px;border-radius:50%;display:inline-block}
+    .leaflet-popup-content-wrapper{border-radius:2px;box-shadow:0 2px 10px rgba(36,56,42,.25)}
+    .leaflet-popup-content{font-family:'Inter',sans-serif;font-size:13px;margin:12px 14px;line-height:1.5;min-width:230px}
+    .leaflet-popup-content strong{color:var(--verde-escuro);font-family:'Source Serif 4',Georgia,serif;font-size:14px}
+    .leaflet-popup-tip,.leaflet-popup-content-wrapper{background:var(--creme)}
+    .ponto-tooltip{background:var(--verde-escuro);color:#fff;border:none;font-family:'Inter',sans-serif;font-size:11px;padding:3px 8px;box-shadow:none}
+    .ponto-tooltip::before{border-top-color:var(--verde-escuro)!important}
+    .tabela-popup{border-collapse:collapse;margin-top:8px;font-size:12px}
+    .tabela-popup td{padding:2px 10px 2px 0;border:none}
+    .tabela-popup td:first-child{color:var(--medio)}
+    .popup-etapas{margin-top:8px;font-size:12px}
+    .grafico-wrapper{position:relative;height:340px;padding:20px 0}
+    .mini-grafico{position:relative;height:240px}
+    .stacked-wrapper{position:relative;height:220px}
+    .duas-colunas{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}
+    .analise-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:32px;align-items:start}
+    .tabela-scroll{overflow-x:auto;border:1px solid var(--claro)}
+    table.tabela-dados{width:100%;border-collapse:collapse;font-size:13px;min-width:1100px}
+    table.tabela-dados thead{background:var(--verde-escuro);color:#fff}
+    table.tabela-dados th{text-align:left;padding:14px 16px;font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,.08);cursor:pointer;user-select:none}
+    table.tabela-dados th:last-child{border-right:none}
+    table.tabela-dados th .seta{opacity:.5;margin-left:4px;font-size:10px}
+    table.tabela-dados td{padding:12px 16px;border-bottom:1px solid var(--claro);border-right:1px solid var(--claro);vertical-align:top}
+    table.tabela-dados td:last-child{border-right:none}
+    table.tabela-dados tbody tr:nth-child(even){background:var(--fundo)}
+    table.tabela-dados tbody tr:hover{background:#EEF2F0}
+    table.tabela-ranking{width:100%;border-collapse:collapse;font-size:13px}
+    table.tabela-ranking th{text-align:left;padding:10px 14px;background:var(--verde-escuro);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+    table.tabela-ranking td{padding:10px 14px;border-bottom:1px solid var(--claro)}
+    table.tabela-ranking tbody tr:nth-child(even){background:var(--fundo)}
+    table.tabela-ranking td.num{font-family:'Source Serif 4',Georgia,serif;font-weight:700;color:var(--verde);font-size:15px}
+    .celula-vazia{color:var(--medio);font-style:italic}
+    .ok{color:var(--verde);font-weight:700}
+    .nok{color:var(--terracota);font-weight:700}
+    .chip-etapa{display:inline-block;font-size:10px;border:1px solid var(--borda);padding:1px 6px;margin:1px 2px 1px 0;background:var(--fundo);white-space:nowrap}
+    .paginacao{display:flex;justify-content:space-between;align-items:center;padding:18px 0;font-size:13px;color:var(--medio);flex-wrap:wrap;gap:12px}
+    .paginacao .controles{display:flex;gap:8px;align-items:center}
+    .paginacao button{font-size:12px;font-weight:600;text-transform:uppercase;padding:9px 18px;background:var(--branco);border:1px solid var(--borda);color:var(--grafite);cursor:pointer}
+    .paginacao button:hover:not(:disabled){background:var(--verde);border-color:var(--verde);color:#fff}
+    .paginacao button:disabled{opacity:.4;cursor:not-allowed}
+    .paginacao select{font-size:12px;padding:8px 10px;border:1px solid var(--borda)}
+    .estado-vazio{text-align:center;padding:48px 20px;color:var(--medio);font-style:italic}
+    .caixa-aviso{background:var(--alerta-bg);border:1px solid var(--alerta-borda);padding:18px 20px;font-size:13px;color:#5C4A1A;margin-top:14px}
+    .caixa-aviso strong{display:block;margin-bottom:6px;color:#4A3B14;text-transform:uppercase;font-size:11px;letter-spacing:.06em}
+    .fontes-grid{display:grid;grid-template-columns:2fr 1fr;gap:32px}
+    .fontes-texto p{margin-bottom:14px;font-size:14px}
+    .fontes-texto ul{margin:0 0 14px 20px;font-size:14px}
+    .fontes-texto li{margin-bottom:6px}
+    .cartao-fonte{border:1px solid var(--claro);padding:22px;background:var(--fundo)}
+    .cartao-fonte h3{font-family:'Source Serif 4',Georgia,serif;font-size:16px;color:var(--verde-escuro);margin-bottom:10px}
+    .cartao-fonte a.link-fonte{display:block;font-size:13px;color:var(--verde);font-weight:600;margin-bottom:14px;word-break:break-word;text-decoration:none;border-bottom:1px solid var(--verde);padding-bottom:2px}
+    .cartao-fonte a.link-fonte:hover{color:var(--dourado);border-color:var(--dourado)}
+    .cartao-fonte .separador{border-top:1px solid var(--claro);margin:16px 0}
+    .lista-download{display:flex;flex-direction:column;gap:10px}
+    .lista-download button{text-align:left;font-size:13px;font-weight:600;padding:10px 14px;border:1px solid var(--verde);background:var(--branco);color:var(--verde);cursor:pointer}
+    .lista-download button:hover{background:var(--verde);color:#fff}
+    .construtor-caixa{border:1px solid var(--claro);background:var(--fundo);padding:24px}
+    .construtor-controles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;align-items:end;margin-bottom:20px}
+    .construtor-resultado{background:var(--branco);border:1px solid var(--claro);padding:20px}
+    .construtor-grafico{position:relative;height:360px;margin-bottom:16px}
+    .nota-metodo{font-size:12px;color:var(--medio);font-style:italic;margin-top:10px}
+    footer.site-footer{background:var(--verde-escuro);color:rgba(255,255,255,.7);padding:44px 0 30px;font-size:13px;margin-top:20px}
+    footer.site-footer .container{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:28px}
+    footer.site-footer strong{color:#fff;font-weight:600;display:block;margin-bottom:8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+    footer.site-footer p{margin-bottom:6px}
+    footer.site-footer .assinatura{border-top:1px solid rgba(255,255,255,.15);margin-top:30px;padding-top:20px;grid-column:1/-1;font-size:12px;color:rgba(255,255,255,.5)}
+    @media(max-width:900px){.fontes-grid,.duas-colunas,.analise-grid{grid-template-columns:1fr}}
+    @media(max-width:768px){
+        .container{padding:0 20px}
+        .header-titulos h1{font-size:22px}
+        .header-marca{flex-direction:column;gap:16px}
+        .mapa-wrapper{height:380px}
+        section.bloco{padding:32px 0}
+    }
+</style>
+</head>
+<body>
+
+<!-- FAIXA INSTITUCIONAL -->
+<div class="top-bar">
+    <div class="container">
+        <span><strong>CONAQ</strong> · Coordenação Nacional de Articulação das Comunidades Negras Rurais Quilombolas — <strong>Coletivo de Educação</strong></span>
+        <span>Painel construído sobre dados públicos do Censo Escolar (INEP)</span>
+    </div>
+</div>
+
+<!-- CABEÇALHO -->
+<header class="site-header">
+    <div class="motivo-raiz" aria-hidden="true"><svg viewBox="0 0 1000 260" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" stroke="#24382A" fill="none" stroke-width="2.4" stroke-linecap="round">
+      <path d="M60,260 C90,190 40,150 90,90 C120,50 90,10 140,-10"/>
+      <path d="M60,260 C100,210 130,205 150,150 C165,115 210,110 220,60"/>
+      <path d="M60,260 C40,200 70,170 40,120 C20,90 40,60 15,20"/>
+      <path d="M150,150 C180,140 195,110 230,105"/>
+      <path d="M90,90 C60,75 55,50 20,45"/>
+      <path d="M940,260 C910,190 960,150 910,90 C880,50 910,10 860,-10"/>
+      <path d="M940,260 C900,210 870,205 850,150 C835,115 790,110 780,60"/>
+      <path d="M940,260 C960,200 930,170 960,120 C980,90 960,60 985,20"/>
+      <path d="M850,150 C820,140 805,110 770,105"/>
+      <path d="M910,90 C940,75 945,50 980,45"/>
+      <path d="M500,260 C520,200 480,175 500,120 C515,85 490,55 510,10"/>
+      <path d="M500,260 C475,195 520,180 495,125"/>
+    </svg></div>
+    <div class="container">
+        <div class="header-marca">
+            <div class="header-simbolo" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 21C12 21 4 17.2 4 9.3C4 5.1 7.3 2 12 2C16.7 2 20 5.1 20 9.3C20 17.2 12 21 12 21Z" fill="#FFFFFF"/>
+              <path d="M12 20V4" stroke="#3B5D42" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+              <path d="M12 9L8.2 6.3M12 13L7.6 10.6M12 16.6L8.4 14.6" stroke="#3B5D42" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+              <path d="M12 9L15.8 6.3M12 13L16.4 10.6M12 16.6L15.6 14.6" stroke="#3B5D42" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+            </svg></div>
+            <div class="header-titulos">
+                <h1>Escolas Quilombolas em Dados</h1>
+                <p class="subtitulo-nome">Observatório das escolas em comunidades quilombolas</p>
+                <p class="subtitulo">Um painel do Coletivo de Educação da CONAQ para monitorar as condições de funcionamento, a infraestrutura e a oferta de ensino das escolas localizadas em comunidades quilombolas, a partir dos microdados do Censo Escolar (INEP). Reúne mapa com camadas, indicadores e uma ferramenta de cruzamento de variáveis — sem precisar lidar com planilha dinâmica.</p>
+            </div>
+        </div>
+        <div class="header-meta">
+            <span><strong>Última atualização da base:</strong> __DATA_GERACAO__</span>
+            <span><strong>Fonte primária:</strong> Censo Escolar __ANO_CENSO__ — INEP</span>
+            <span><strong>Registros:</strong> __TOTAL_ESCOLAS__ escolas · __TOTAL_MUNICIPIOS__ municípios · __TOTAL_UFS__ UF</span>
+        </div>
+    </div>
+</header>
+
+<!-- INDICADORES -->
+<section class="bloco">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Panorama geral</div>
+                <h2>Síntese dos indicadores</h2>
+                <p class="descricao">Números consolidados para o recorte selecionado abaixo. Os percentuais são calculados sobre as escolas com informação no Censo (códigos 0 ou 1); escolas sem dado entram apenas na contagem total.</p>
+            </div>
+        </div>
+        <div class="indicadores-grid" id="indicadores"></div>
+    </div>
+</section>
+
+<!-- FILTROS -->
+<section class="bloco bloco-filtros">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Comece por aqui</div>
+                <h2>Filtre o recorte que quer estudar</h2>
+                <p class="descricao">Os filtros valem para a página inteira: mapa, indicadores, gráficos, tabela e cruzamentos mudam juntos.</p>
+            </div>
+        </div>
+        <div class="filtros">
+            <div class="campo"><label for="filterRegiao">Região</label><select id="filterRegiao"><option value="">Todas</option></select></div>
+            <div class="campo"><label for="filterUF">UF</label><select id="filterUF"><option value="">Todas</option></select></div>
+            <div class="campo"><label for="filterDep">Dependência administrativa</label><select id="filterDep"><option value="">Todas</option></select></div>
+            <div class="campo"><label for="filterLoc">Localização</label><select id="filterLoc"><option value="">Todas</option></select></div>
+            <div class="campo"><label for="filterSit">Situação</label><select id="filterSit"><option value="">Todas</option></select></div>
+            <div class="campo"><label for="filterEtapa">Oferece etapa</label><select id="filterEtapa"><option value="">Qualquer</option></select></div>
+            <div class="campo"><label for="filterBusca">Busca</label><input type="text" id="filterBusca" placeholder="Nome da escola ou município"></div>
+            <div class="campo"><label>&nbsp;</label><button class="btn-limpar" id="btnLimpar">Limpar filtros</button></div>
+        </div>
+    </div>
+</section>
+<div class="faixa-recorte" id="faixaRecorte"></div>
+
+<!-- MAPA -->
+<section class="bloco">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Distribuição territorial</div>
+                <h2>Mapa das escolas quilombolas</h2>
+                <p class="descricao">Cada ponto é uma escola. Troque o fundo do mapa no seletor do canto superior direito (claro, ruas, satélite ou relevo) e escolha a camada temática para mudar a cor dos pontos. Clique em um ponto para ver a ficha da escola.</p>
+            </div>
+        </div>
+        <div class="camadas-painel">
+            <div class="campo">
+                <label for="camadaTematica">Camada temática (cor dos pontos)</label>
+                <select id="camadaTematica">
+                    <option value="regiao">Região do país</option>
+                    <option value="dep">Dependência administrativa</option>
+                    <option value="loc">Urbana / Rural</option>
+                    <option value="internet">Internet</option>
+                    <option value="aguaPotavel">Água potável</option>
+                    <option value="energiaRede">Energia da rede pública</option>
+                    <option value="esgotoRede">Esgoto da rede pública</option>
+                    <option value="banheiroPne">Banheiro acessível</option>
+                    <option value="acess">Acessibilidade (algum recurso)</option>
+                    <option value="matQuilombola">Material pedagógico quilombola</option>
+                    <option value="internetAlunos">Internet para alunos</option>
+                    <option value="bandaLarga">Banda larga</option>
+                    <option value="alimentacao">Alimentação escolar</option>
+                    <option value="labInfo">Laboratório de informática</option>
+                </select>
+            </div>
+            <div class="campo">
+                <label>&nbsp;</label>
+                <button class="btn-limpar" id="btnAjustarMapa">Ajustar zoom ao recorte</button>
+            </div>
+        </div>
+        <div class="mapa-wrapper">
+            <div id="mapa"></div>
+            <div class="mapa-dica" id="mapaDica">Arraste para navegar · use o zoom do mouse</div>
+        </div>
+        <div class="mapa-legenda" id="legendaMapa"></div>
+        <div class="caixa-aviso" style="margin-top:16px;">
+            <strong>Nota metodológica do mapa</strong>
+            <span id="notaGeo"></span> As coordenadas vêm da planilha-fonte; quando o valor chega corrompido pela formatação (vírgula decimal lida como separador de milhar), o script de atualização recupera o número original e o valida contra o centróide do município (código IBGE). Quando não há como recuperar, a escola é posicionada no centróide do município. __NAO_GEOCODIFICADOS__ escola(s) ficaram sem localização e não aparecem no mapa — continuam nos gráficos e na tabela.
+        </div>
+    </div>
+</section>
+
+<!-- INFRAESTRUTURA -->
+<section class="bloco">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Condições de funcionamento</div>
+                <h2>Infraestrutura básica das escolas</h2>
+                <p class="descricao">Percentual de escolas do recorte com cada serviço ou dependência, entre as que declararam informação no Censo. Barras em terracota indicam indicadores abaixo de 50%.</p>
+            </div>
+        </div>
+        <div class="grafico-wrapper" style="height:520px;"><canvas id="graficoInfra"></canvas></div>
+    </div>
+</section>
+
+<!-- RETRATOS DA REDE -->
+<section class="bloco">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Retratos da rede</div>
+                <h2>Dependência administrativa, localização e comparação regional</h2>
+                <p class="descricao">Quem mantém as escolas quilombolas, onde elas estão e como os principais indicadores se comparam entre as regiões.</p>
+            </div>
+        </div>
+        <div class="duas-colunas" style="margin-bottom:32px;">
+            <div>
+                <p class="descricao" style="margin-bottom:10px;">Dependência administrativa:</p>
+                <div class="mini-grafico"><canvas id="graficoDep"></canvas></div>
+            </div>
+            <div>
+                <p class="descricao" style="margin-bottom:10px;">Localização:</p>
+                <div class="mini-grafico"><canvas id="graficoLoc"></canvas></div>
+            </div>
+        </div>
+        <div class="analise-grid">
+            <div>
+                <p class="descricao" style="margin-bottom:10px;">Comparativo por região (percentual dentro de cada uma):</p>
+                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoRegiaoComp"></canvas></div>
+            </div>
+            <div>
+                <p class="descricao" style="margin-bottom:10px;">Etapas de ensino ofertadas (nº de escolas):</p>
+                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoEtapas"></canvas></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- EQUIPE -->
+<section class="bloco">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Equipe das escolas</div>
+                <h2>Profissionais em atividade</h2>
+                <p class="descricao">Soma dos profissionais declarados no Censo por tipo, no recorte atual. Note a presença (ou ausência) de profissionais de apoio importantes para a educação escolar quilombola.</p>
+            </div>
+        </div>
+        <div class="grafico-wrapper" style="height:460px;"><canvas id="graficoProfs"></canvas></div>
+    </div>
+</section>
+
+<!-- TABELA -->
+<section class="bloco">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Registros</div>
+                <h2>Relação das escolas</h2>
+                <p class="descricao">Escolas que atendem aos filtros. Clique no cabeçalho de uma coluna para ordenar.</p>
+            </div>
+        </div>
+        <div class="barra-acoes">
+            <button class="btn-primario" id="btnExportarCSV">Baixar seleção atual (CSV)</button>
+            <button class="btn-limpar" id="btnExportarJSON">Baixar seleção atual (JSON)</button>
+        </div>
+        <div class="tabela-scroll" style="margin-top:16px;">
+            <table class="tabela-dados" id="tabelaPrincipal">
+                <thead><tr>
+                    <th data-campo="escola">Escola<span class="seta"></span></th>
+                    <th data-campo="municipio">Município<span class="seta"></span></th>
+                    <th data-campo="uf">UF<span class="seta"></span></th>
+                    <th data-campo="dep">Dependência<span class="seta"></span></th>
+                    <th data-campo="loc">Localização<span class="seta"></span></th>
+                    <th data-campo="sit">Situação<span class="seta"></span></th>
+                    <th data-campo="internet">Internet<span class="seta"></span></th>
+                    <th data-campo="aguaPotavel">Água<span class="seta"></span></th>
+                    <th data-campo="energiaRede">Energia<span class="seta"></span></th>
+                    <th data-campo="esgotoRede">Esgoto<span class="seta"></span></th>
+                    <th data-campo="salas">Salas<span class="seta"></span></th>
+                    <th>Etapas ofertadas</th>
+                </tr></thead>
+                <tbody id="tabelaCorpo"></tbody>
+            </table>
+        </div>
+        <div class="paginacao" id="paginacao"></div>
+    </div>
+</section>
+
+<!-- CRUZADOR DE VARIÁVEIS -->
+<section class="bloco">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Explore por conta própria</div>
+                <h2>Monte seu próprio cruzamento</h2>
+                <p class="descricao">Escolha uma variável para as linhas, outra (opcional) para cruzar, e o que medir. Exemplo: “% com internet” cruzando “UF” × “Localização”. O gráfico, a tabela cruzada e o download são gerados automaticamente.</p>
+            </div>
+        </div>
+        <div class="construtor-caixa">
+            <div class="construtor-controles">
+                <div class="campo"><label for="cruzA">Variável A (linhas / eixo)</label><select id="cruzA"></select></div>
+                <div class="campo"><label for="cruzB">Variável B (cruzar com — opcional)</label><select id="cruzB"></select></div>
+                <div class="campo"><label for="cruzModo">Medida</label>
+                    <select id="cruzModo">
+                        <option value="contagem">Nº de escolas</option>
+                        <option value="pct">% de escolas com…</option>
+                        <option value="soma">Soma de…</option>
+                        <option value="media">Média de…</option>
+                    </select>
+                </div>
+                <div class="campo" id="linhaCruzInd" style="display:none;"><label for="cruzInd">… indicador</label><select id="cruzInd"></select></div>
+                <div class="campo" id="linhaCruzNum" style="display:none;"><label for="cruzNum">… campo numérico</label><select id="cruzNum"></select></div>
+                <div class="campo"><label>Gráfico</label><button class="btn-limpar" id="btnEmpilha">Ver agrupado</button></div>
+            </div>
+            <div class="construtor-resultado">
+                <div class="construtor-grafico"><canvas id="graficoCruzador"></canvas></div>
+                <div class="tabela-scroll" style="max-height:420px;overflow-y:auto;">
+                    <table class="tabela-ranking" id="tabelaCruzador">
+                        <thead><tr id="cabecalhoCruzador"></tr></thead>
+                        <tbody id="corpoCruzador"></tbody>
+                    </table>
+                </div>
+                <div class="nota-metodo" id="notaCruzador"></div>
+            </div>
+            <div class="barra-acoes">
+                <button class="btn-primario" id="btnBaixarCruzamento">Baixar este cruzamento (CSV)</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FONTES -->
+<section class="bloco">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Transparência</div>
+                <h2>Fonte dos dados e critérios de veracidade</h2>
+                <p class="descricao">Antes de citar estes dados em relatórios, artigos ou documentos de advocacy, confira a fonte primária e as observações metodológicas abaixo.</p>
+            </div>
+        </div>
+        <div class="fontes-grid">
+            <div class="fontes-texto">
+                <p><strong>De onde vêm os dados.</strong> Os microdados do Censo Escolar da Educação Básica (__ANO_CENSO__) são produzidos pelo INEP. Este painel usa a tabela “Escola”, recortada para as escolas com localização diferenciada em comunidade quilombola (TP_LOCALIZACAO_DIFERENCIADA = 3) — categoria declarada pela própria escola no ato do censo. O recorte completo do Censo também distingue áreas de assentamento, terras indígenas e áreas de povos e comunidades tradicionais; aqui cobrimos o recorte quilombola.</p>
+                <p><strong>Como a base é mantida.</strong> A planilha que alimenta o painel é mantida e atualizada pelo Coletivo de Educação da CONAQ a partir dos microdados públicos. A atualização desta página é automática (semanal): quando a planilha muda, o painel se regenera sozinho.</p>
+                <ul>
+                    <li>Consulte os microdados oficiais do Censo Escolar na página do INEP.</li>
+                    <li>Abra a planilha de trabalho completa para auditar, filtrar e cruzar os dados originais.</li>
+                    <li>Baixe os dados diretamente desta página em CSV ou JSON, respeitando os filtros aplicados.</li>
+                </ul>
+                <div class="caixa-aviso">
+                    <strong>Limitações conhecidas</strong>
+                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais — por isso alguns “n” variam entre indicadores. Endereço e telefone das escolas não são exibidos (LGPD). As coordenadas, retiradas dos microdados públicos pelo INEP a partir de 2025, são usadas aqui apenas para a leitura territorial do mapa; quando indisponíveis, a escola é posicionada no centróide do município. O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
+                </div>
+            </div>
+            <div class="cartao-fonte">
+                <h3>Baixar e conferir</h3>
+                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-educacionais/censo-escolar" target="_blank" rel="noopener">↗ Censo Escolar — página oficial do INEP</a>
+                <a class="link-fonte" href="__LINK_PLANILHA__" target="_blank" rel="noopener">↗ Planilha de trabalho completa (Google Sheets)</a>
+                <div class="separador"></div>
+                <div class="lista-download">
+                    <button id="btnBaixarTudoCSV">Base completa em CSV</button>
+                    <button id="btnBaixarTudoJSON">Base completa em JSON</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- RODAPÉ -->
+<footer class="site-footer">
+    <div class="container">
+        <div>
+            <strong>CONAQ</strong>
+            <p>Coordenação Nacional de Articulação das Comunidades Negras Rurais Quilombolas.</p>
+            <p>Este painel é mantido pelo Coletivo de Educação para subsidiar o monitoramento das condições das escolas em comunidades quilombolas.</p>
+        </div>
+        <div>
+            <strong>Educação Escolar Quilombola</strong>
+            <p>Marco de referência: Resolução CNE/CEB nº 8/2012, que define as Diretrizes Curriculares Nacionais para a Educação Escolar Quilombola.</p>
+        </div>
+        <div>
+            <strong>Dados</strong>
+            <p>Microdados do Censo Escolar da Educação Básica (INEP) — recorte de escolas em comunidades quilombolas.</p>
+        </div>
+        <div class="assinatura">Painel adaptado do projeto Raizame Dados · Atualização automática semanal a partir da planilha mantida pelo coletivo · Última geração: __DATA_GERACAO__</div>
+    </div>
+</footer>
+
+<script>
+/* ==================== DADOS E DICCIONÁRIOS ==================== */
+const DADOS = __DATA_JSON__;
+const $ = id => document.getElementById(id);
+const fmt = n => (n == null ? 0 : n).toLocaleString('pt-BR');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const DEPS = {1:'Federal',2:'Estadual',3:'Municipal',4:'Privada'};
+const CORES_DEP = {1:'#1E40AF',2:'#B9812F',3:'#3B5D42',4:'#A85630'};
+const SITS = {1:'Em atividade',2:'Paralisada',3:'Extinta (no ano do Censo)',4:'Extinta em anos anteriores'};
+const LOCS = {1:'Urbana',2:'Rural'};
+const CORES_REGIAO = {'Norte':'#1B4332','Nordeste':'#92400E','Centro-Oeste':'#7C2D12','Sudeste':'#4C1D95','Sul':'#1E3A8A'};
+const ORDEM_REGIAO = ['Norte','Nordeste','Centro-Oeste','Sudeste','Sul'];
+const PALETA = ['#3B5D42','#B9812F','#A85630','#1E40AF','#7C2D12','#4C1D95','#1B4332','#92400E','#6B7280','#8A7C68'];
+
+const ETAPAS = [
+  ['creche','Creche'],['preEscolar','Pré-escola'],['fundAI','Fund. anos iniciais'],
+  ['fundAF','Fund. anos finais'],['medio','Ensino médio'],['medioIntegrado','Médio integrado'],
+  ['ejaFund','EJA fundamental'],['ejaMedio','EJA médio'],['profissionalizante','Profissionalizante'],
+  ['especialExclusiva','AEE exclusivo']];
+
+const ROTULOS_PROF = {profCoordenador:'Coordenação pedagógica',profPedagogo:'Pedagogos',profAdministrativo:'Administrativos',
+  profServicos:'Serviços gerais',profAlimentacao:'Alimentação',profSecretario:'Secretários',profGestao:'Gestão',
+  profMonitor:'Monitores',profSeguranca:'Segurança',profAssistenteSocial:'Assistentes sociais',profBibliotecario:'Bibliotecários',
+  profSaude:'Profissionais de saúde',profNutricionista:'Nutricionistas',profPsicologo:'Psicólogos',profFonoaudiologo:'Fonoaudiólogos',
+  profLibras:'Intérpretes de Libras',profAgricola:'Técnicos agrícolas',profBraille:'Revisores de Braille'};
+
+const IND = {
+  aguaPotavel:'Água potável',aguaRede:'Água da rede pública',aguaCacimba:'Água de cacimba/poço',aguaFonte:'Água de fonte/rio',
+  aguaPipa:'Água por carro-pipa',aguaInexistente:'Sem abastecimento de água',
+  energiaRede:'Energia da rede pública',energiaRenovavel:'Energia renovável',energiaInexistente:'Sem energia elétrica',
+  esgotoRede:'Esgoto da rede pública',esgotoFossa:'Esgoto em fossa',esgotoInexistente:'Sem esgotamento sanitário',
+  lixoColeta:'Coleta de lixo',lixoQueima:'Lixo queimado na escola',
+  internet:'Internet',internetAlunos:'Internet para alunos',internetComunidade:'Internet aberta à comunidade',bandaLarga:'Banda larga',
+  banheiro:'Banheiro',banheiroPne:'Banheiro acessível (PNE)',banheiroChuveiro:'Banheiro com chuveiro',
+  acess:'Acessibilidade (algum recurso)',biblioteca:'Biblioteca / sala de leitura',labInfo:'Laboratório de informática',
+  labCiencias:'Laboratório de ciências',quadra:'Quadra de esportes',refeitorio:'Refeitório',cozinha:'Cozinha',despensa:'Despensa',
+  parqueInfantil:'Parque infantil',patioCoberto:'Pátio coberto',salaAee:'Sala de recursos (AEE)',alimentacao:'Alimentação escolar',
+  matQuilombola:'Material pedagógico quilombola',matEtnico:'Material étnico-racial',matCampo:'Material do campo',
+  matIndigena:'Material indígena',matMultimidia:'Material multimídia',matCientifico:'Material científico',
+  conselhoEscolar:'Conselho escolar',gremio:'Grêmio estudantil',assocPais:'Associação de pais e mestres',educAmbiental:'Educação ambiental',
+  temComputador:'Computador',temTV:'TV',temMultimidia:'Projetor multimídia',temLousa:'Lousa digital',equipParabolica:'Antena parabólica'};
+
+const LISTA_INFRA = ['aguaPotavel','energiaRede','esgotoRede','lixoColeta','internet','internetAlunos','bandaLarga',
+  'banheiro','banheiroPne','acess','biblioteca','labInfo','labCiencias','quadra','refeitorio','cozinha','alimentacao',
+  'matQuilombola','matEtnico','conselhoEscolar','salaAee'];
+
+function dimBin(campo, rot){ return {rot, fn:r=>r[campo]===1?'Sim':(r[campo]===0?'Não':'Sem dado'), ordem:['Sim','Não','Sem dado']}; }
+const DIM = {
+  regiao:{rot:'Região',fn:r=>r.regiao||'—',ordem:ORDEM_REGIAO},
+  uf:{rot:'UF',fn:r=>r.uf||'—'},
+  municipio:{rot:'Município',fn:r=>r.municipio||'—'},
+  dep:{rot:'Dependência administrativa',fn:r=>DEPS[r.dep]||'Sem dado',ordem:['Federal','Estadual','Municipal','Privada']},
+  loc:{rot:'Localização urbana/rural',fn:r=>LOCS[r.loc]||'Sem dado',ordem:['Urbana','Rural']},
+  situacao:{rot:'Situação de funcionamento',fn:r=>SITS[r.sit]||'Sem dado'}};
+[['internet','Acesso à internet'],['aguaPotavel','Água potável'],['aguaRede','Água da rede pública'],
+ ['energiaRede','Energia da rede pública'],['esgotoRede','Esgoto da rede pública'],['internetAlunos','Internet para alunos'],
+ ['bandaLarga','Banda larga'],['banheiroPne','Banheiro acessível'],['acess','Acessibilidade (algum recurso)'],
+ ['matQuilombola','Material pedagógico quilombola'],['alimentacao','Alimentação escolar'],['conselhoEscolar','Conselho escolar'],
+ ['educAmbiental','Educação ambiental']].forEach(p => DIM[p[0]] = dimBin(p[0], p[1]));
+
+const NUMERICOS = {salas:'Salas de aula utilizadas',salasAcessiveis:'Salas acessíveis',salasClimatizadas:'Salas climatizadas',
+  desktops:'Desktops para alunos',notebooks:'Notebooks para alunos',tablets:'Tablets para alunos',profTotal:'Profissionais (total)'};
+
+/* ==================== ESTADO ==================== */
+const filtros = {regiao:'',uf:'',dep:'',loc:'',sit:'',etapa:'',busca:''};
+let visiveis = [], ordenacao = {campo:'escola',dir:1}, pagina = 1, porPagina = 20;
+let cruzEmpilhado = true, ultimoCruzamento = null;
+
+/* ==================== GRÁFICOS ==================== */
+const graficos = {};
+function desenha(id, cfg){
+  if (graficos[id]) graficos[id].destroy();
+  graficos[id] = new Chart($(id), cfg);
+}
+
+/* ==================== FILTROS ==================== */
+function aplicaFiltros(){
+  const b = filtros.busca.trim().toLowerCase();
+  visiveis = DADOS.filter(r => {
+    if (filtros.regiao && r.regiao !== filtros.regiao) return false;
+    if (filtros.uf && r.uf !== filtros.uf) return false;
+    if (filtros.dep && String(r.dep) !== filtros.dep) return false;
+    if (filtros.loc && String(r.loc) !== filtros.loc) return false;
+    if (filtros.sit && String(r.sit) !== filtros.sit) return false;
+    if (filtros.etapa && r[filtros.etapa] !== 1) return false;
+    if (b && !((r.escola||'')+' '+(r.municipio||'')+' '+(r.uf||'')).toLowerCase().includes(b)) return false;
+    return true;
+  });
+}
+function pct(campo, arr){
+  let sim=0, nao=0;
+  arr.forEach(r=>{ if (r[campo]===1) sim++; else if (r[campo]===0) nao++; });
+  const n = sim+nao;
+  return {p: n ? 100*sim/n : null, sim, n};
+}
+const pctTxt = p => p.p==null ? '—' : p.p.toFixed(1).replace('.',',')+'%';
+const notaN = p => `n = ${fmt(p.n)} escolas com dado`;
+const contaMunicipios = () => new Set(visiveis.filter(r=>r.ibge).map(r=>r.ibge)).size;
+const contaUF = () => new Set(visiveis.filter(r=>r.uf).map(r=>r.uf)).size;
+
+/* ==================== INDICADORES ==================== */
+function renderIndicadores(){
+  const pA=pct('aguaPotavel',visiveis), pE=pct('energiaRede',visiveis), pI=pct('internet',visiveis),
+        pS=pct('esgotoRede',visiveis), pAc=pct('acess',visiveis), pM=pct('matQuilombola',visiveis);
+  const cartoes = [
+    [fmt(visiveis.length),'Escolas no recorte',`de ${fmt(DADOS.length)} no total`],
+    [fmt(contaMunicipios()),'Municípios',`${contaUF()} UF`],
+    [pctTxt(pA),'Com água potável',notaN(pA)],
+    [pctTxt(pE),'Com energia da rede',notaN(pE)],
+    [pctTxt(pI),'Com internet',notaN(pI)],
+    [pctTxt(pS),'Com esgoto da rede pública',notaN(pS)],
+    [pctTxt(pAc),'Com algum recurso de acessibilidade',notaN(pAc)],
+    [pctTxt(pM),'Com material pedagógico quilombola',notaN(pM)]];
+  $('indicadores').innerHTML = cartoes.map(c =>
+    `<div class="indicador"><div class="valor">${c[0]}</div><div class="rotulo">${c[1]}</div>${c[2]?`<div class="nota">${c[2]}</div>`:''}</div>`).join('');
+}
+
+/* ==================== MAPA ==================== */
+let mapa, camadaPontos;
+function initMapa(){
+  mapa = L.map('mapa', {preferCanvas:true, minZoom:3}).setView([-10.8,-52.9],4);
+  const bases = {
+    'Claro': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap &middot; &copy; CARTO'}),
+    'Ruas': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}),
+    'Satélite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagens &copy; Esri'}),
+    'Relevo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; OpenTopoMap (CC-BY-SA)'})};
+  bases['Claro'].addTo(mapa);
+  L.control.layers(bases, null, {position:'topright', collapsed:false}).addTo(mapa);
+  L.control.scale({imperial:false}).addTo(mapa);
+  camadaPontos = L.layerGroup().addTo(mapa);
+  mapa.on('click zoomstart', ()=>{ $('mapaDica').style.opacity = 0; });
+}
+function corPonto(r){
+  const t = $('camadaTematica').value;
+  if (t==='regiao') return CORES_REGIAO[r.regiao] || '#8A7C68';
+  if (t==='dep') return CORES_DEP[r.dep] || '#8A7C68';
+  if (t==='loc') return r.loc===1 ? '#B9812F' : (r.loc===2 ? '#3B5D42' : '#8A7C68');
+  const v = r[t];
+  return v===1 ? '#3B5D42' : (v===0 ? '#A85630' : '#8A7C68');
+}
+function popupEscola(r){
+  const linhas = [
+    ['Dependência', DEPS[r.dep]], ['Localização', (LOCS[r.loc]||'')+(r.locDif==3?' · comunidade quilombola':'')],
+    ['Situação', SITS[r.sit]], ['Salas utilizadas', r.salas!=null?r.salas:null],
+    ['Internet', r.internet===1?'Sim':(r.internet===0?'Não':null)],
+    ['Água potável', r.aguaPotavel===1?'Sim':(r.aguaPotavel===0?'Não':null)],
+    ['Energia (rede)', r.energiaRede===1?'Sim':(r.energiaRede===0?'Não':null)],
+    ['Esgoto (rede)', r.esgotoRede===1?'Sim':(r.esgotoRede===0?'Não':null)],
+    ['Mat. quilombola', r.matQuilombola===1?'Sim':(r.matQuilombola===0?'Não':null)]
+  ].filter(l=>l[1]).map(l=>`<tr><td>${l[0]}</td><td><strong>${l[1]}</strong></td></tr>`).join('');
+  const etapas = ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>t).join(', ');
+  return `<strong>${esc(r.escola)}</strong><br>${esc(r.municipio)} (${r.uf})` +
+    `<table class="tabela-popup">${linhas}</table>` +
+    (etapas?`<div class="popup-etapas"><b>Oferta:</b> ${etapas}</div>`:'') +
+    `<div class="popup-etapas" style="color:#8A7C68;">cód. INEP ${r.cod||'—'}</div>`;
+}
+function renderPontos(){
+  camadaPontos.clearLayers();
+  visiveis.forEach(r=>{
+    if (r.lat==null || r.lon==null) return;
+    const m = L.circleMarker([r.lat,r.lon],{radius:5.5,weight:1,color:'#FBF6EA',fillColor:corPonto(r),fillOpacity:.85});
+    m.bindTooltip(r.escola, {className:'ponto-tooltip'});
+    m.on('click', ()=>{ m.bindPopup(popupEscola(r), {maxWidth:320}).openPopup(); });
+    camadaPontos.addLayer(m);
+  });
+  atualizaLegendaMapa();
+  atualizaNotaGeo();
+}
+function atualizaLegendaMapa(){
+  const t = $('camadaTematica').value; let itens;
+  if (t==='regiao') itens = ORDEM_REGIAO.map(g=>[CORES_REGIAO[g],g]);
+  else if (t==='dep') itens = Object.values(DEPS).map((n,i)=>[Object.values(CORES_DEP)[i],n]);
+  else if (t==='loc') itens = [['#B9812F','Urbana'],['#3B5D42','Rural'],['#8A7C68','Sem dado']];
+  else itens = [['#3B5D42','Sim'],['#A85630','Não'],['#8A7C68','Sem dado']];
+  $('legendaMapa').innerHTML = itens.map(([c,t2])=>`<span class="item"><span class="bolinha" style="background:${c}"></span>${t2}</span>`).join('');
+}
+function atualizaNotaGeo(){
+  const a = visiveis.filter(r=>r.fonteGeo==='escola').length, b = visiveis.filter(r=>r.fonteGeo==='municipio').length;
+  $('notaGeo').textContent = `No recorte atual, ${fmt(a)} escola(s) estão posicionadas pela própria coordenada geográfica e ${fmt(b)} pelo centróide do município.`;
+}
+
+/* ==================== GRÁFICOS DAS SEÇÕES ==================== */
+function renderInfra(){
+  const res = LISTA_INFRA.map(c=>({c, rot:IND[c]||c, ...pct(c,visiveis)})).filter(x=>x.n>0).sort((a,b)=>(b.p??-1)-(a.p??-1));
+  desenha('graficoInfra',{type:'bar',
+    data:{labels:res.map(x=>x.rot),datasets:[{data:res.map(x=>x.p==null?null:x.p),
+      backgroundColor:res.map(x=>x.p==null?'#8A7C68':(x.p<50?'#A85630':'#3B5D42'))}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const x=res[ctx.dataIndex];
+        return [` ${x.p==null?'sem dado':x.p.toFixed(1).replace('.',',')+'%'} das escolas com dado`,` ${fmt(x.sim)} de ${fmt(x.n)} escolas`];}}}},
+      scales:{x:{max:100,ticks:{callback:v=>v+'%'}}}}});
+}
+function renderDonut(id, pares){
+  const tot = pares.reduce((t,p)=>t+p.n,0);
+  desenha(id,{type:'doughnut',
+    data:{labels:pares.map(p=>p.label),datasets:[{data:pares.map(p=>p.n),
+      backgroundColor:pares.map(p=>p.cor),borderColor:'#FBF6EA',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${fmt(ctx.parsed)} (${tot?Math.round(100*ctx.parsed/tot):0}%)`}}}}});
+}
+function renderDonuts(){
+  const contD = {}; visiveis.forEach(r=>{const k=DEPS[r.dep]||'Sem dado'; contD[k]=(contD[k]||0)+1;});
+  const coresDepPorNome = {}; Object.entries(DEPS).forEach(([d,n])=>coresDepPorNome[n]=CORES_DEP[d]);
+  renderDonut('graficoDep', Object.entries(contD).map(([label,n])=>({label,n,cor:coresDepPorNome[label]||'#8A7C68'})));
+  const contL = {'Urbana':0,'Rural':0,'Sem dado':0}; visiveis.forEach(r=>{contL[LOCS[r.loc]||'Sem dado']++;});
+  renderDonut('graficoLoc', Object.entries(contL).filter(([,n])=>n>0)
+    .map(([label,n])=>({label,n,cor:label==='Urbana'?'#B9812F':(label==='Rural'?'#3B5D42':'#8A7C68')})));
+}
+function renderComparativo(){
+  const grupos = ORDEM_REGIAO.filter(g=>visiveis.some(r=>r.regiao===g));
+  const chaves = [['aguaPotavel','Água potável'],['energiaRede','Energia'],['esgotoRede','Esgoto'],
+                  ['internet','Internet'],['matQuilombola','Mat. quilombola'],['acess','Acessibilidade']];
+  desenha('graficoRegiaoComp',{type:'bar',
+    data:{labels:grupos,datasets:chaves.map(([c,rot],i)=>({label:rot,
+      data:grupos.map(g=>{const p=pct(c,visiveis.filter(r=>r.regiao===g)); return p.p==null?null:p.p;}),
+      backgroundColor:PALETA[i]}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12}}},
+      scales:{y:{max:100,ticks:{callback:v=>v+'%'}}}}});
+}
+function renderEtapas(){
+  const dados = ETAPAS.map(([c,rot])=>({rot,n:visiveis.filter(r=>r[c]===1).length})).sort((a,b)=>b.n-a.n);
+  desenha('graficoEtapas',{type:'bar',
+    data:{labels:dados.map(d=>d.rot),datasets:[{data:dados.map(d=>d.n),backgroundColor:'#B9812F'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` ${fmt(c.parsed.y)} escolas`}}},scales:{y:{beginAtZero:true}}}});
+}
+function renderProfs(){
+  const pares = Object.entries(ROTULOS_PROF).map(([c,rot])=>({rot,n:visiveis.reduce((t,r)=>t+(r[c]||0),0)}))
+    .filter(p=>p.n>0).sort((a,b)=>b.n-a.n);
+  desenha('graficoProfs',{type:'bar',
+    data:{labels:pares.map(p=>p.rot),datasets:[{data:pares.map(p=>p.n),backgroundColor:'#3B5D42'}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` ${fmt(c.parsed.x)} profissionais`}}}}});
+}
+
+/* ==================== TABELA ==================== */
+function valorOrd(r,c){
+  if (c==='dep') return DEPS[r.dep]||'';
+  if (c==='loc') return LOCS[r.loc]||'';
+  if (c==='sit') return SITS[r.sit]||'';
+  return r[c];
+}
+function marca(v){ return v===1?'<span class="ok">✓</span>':(v===0?'<span class="nok">✗</span>':'<span class="celula-vazia">—</span>'); }
+function etapasDe(r){ return ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>`<span class="chip-etapa">${t}</span>`).join(' '); }
+function renderTabela(){
+  const lista = [...visiveis].sort((x,y)=>{
+    const a=valorOrd(x,ordenacao.campo), b=valorOrd(y,ordenacao.campo);
+    if (a==null) return 1; if (b==null) return -1;
+    if (typeof a==='number' && typeof b==='number') return (a-b)*ordenacao.dir;
+    return String(a).localeCompare(String(b),'pt-BR')*ordenacao.dir;
+  });
+  const total = lista.length, paginas = Math.max(1, Math.ceil(total/porPagina));
+  if (pagina>paginas) pagina=paginas;
+  const ini=(pagina-1)*porPagina, corte=lista.slice(ini,ini+porPagina);
+  $('tabelaCorpo').innerHTML = corte.length ? corte.map(r=>`<tr>
+      <td><strong>${esc(r.escola)}</strong><br><span class="celula-vazia">cód. ${r.cod||'—'}</span></td>
+      <td>${esc(r.municipio||'—')}</td><td>${r.uf||'—'}</td>
+      <td>${DEPS[r.dep]||'—'}</td><td>${LOCS[r.loc]||'—'}</td><td>${SITS[r.sit]||'—'}</td>
+      <td>${marca(r.internet)}</td><td>${marca(r.aguaPotavel)}</td><td>${marca(r.energiaRede)}</td><td>${marca(r.esgotoRede)}</td>
+      <td>${r.salas!=null?r.salas:'—'}</td><td>${etapasDe(r)}</td></tr>`).join('')
+    : `<tr><td colspan="12" class="estado-vazio">Nenhuma escola no recorte atual.</td></tr>`;
+  const de = total===0?0:ini+1, ate = Math.min(total, ini+porPagina);
+  $('paginacao').innerHTML = `<span>Mostrando ${fmt(de)}–${fmt(ate)} de ${fmt(total)} escolas</span>
+    <span class="controles">
+      <select id="porPaginaSel"><option value="20">20/pág.</option><option value="50">50/pág.</option><option value="100">100/pág.</option></select>
+      <button id="btnAnt" ${pagina<=1?'disabled':''}>‹ Anterior</button>
+      <span>${pagina} / ${paginas}</span>
+      <button id="btnProx" ${pagina>=paginas?'disabled':''}>Próxima ›</button></span>`;
+  $('porPaginaSel').value = String(porPagina);
+  $('porPaginaSel').onchange = e=>{ porPagina=+e.target.value; pagina=1; renderTabela(); };
+  $('btnAnt').onclick = ()=>{ pagina--; renderTabela(); };
+  $('btnProx').onclick = ()=>{ pagina++; renderTabela(); };
+}
+
+/* ==================== CRUZADOR ==================== */
+function renderCruzador(){
+  const aK=$('cruzA').value, bK=$('cruzB').value, modo=$('cruzModo').value;
+  const a=DIM[aK], b=bK?DIM[bK]:null, arr=visiveis;
+  $('linhaCruzInd').style.display = modo==='pct' ? '' : 'none';
+  $('linhaCruzNum').style.display = (modo==='soma'||modo==='media') ? '' : 'none';
+  if (!arr.length){ $('cabecalhoCruzador').innerHTML=''; $('corpoCruzador').innerHTML=''; return; }
+
+  const contA={}; arr.forEach(r=>{const v=a.fn(r); contA[v]=(contA[v]||0)+1;});
+  let cats=Object.keys(contA);
+  if (a.ordem) cats=a.ordem.filter(c=>contA[c]!=null).concat(cats.filter(c=>!a.ordem.includes(c)));
+  else cats.sort((x,y)=>contA[y]-contA[x]||x.localeCompare(y,'pt-BR'));
+
+  let series=[''];
+  if (b){ const contB={}; arr.forEach(r=>{const v=b.fn(r); contB[v]=(contB[v]||0)+1;}); series=Object.keys(contB);
+    if (b.ordem) series=b.ordem.filter(c=>contB[c]!=null).concat(series.filter(c=>!b.ordem.includes(c)));
+    else series.sort((x,y)=>contB[y]-contB[x]||x.localeCompare(y,'pt-BR')); }
+
+  const cel={}; cats.forEach(c=>{cel[c]={}; series.forEach(s=>cel[c][s]={n:0,v:0,cont:0,soma:0});});
+  arr.forEach(r=>{
+    const c=a.fn(r), s=b?b.fn(r):'';
+    if (!cel[c] || !cel[c][s]) return;
+    const t=cel[c][s]; t.n++;
+    if (modo==='contagem') t.v++;
+    else if (modo==='pct'){ const ind=$('cruzInd').value;
+      if (r[ind]===1){t.v++; t.cont++;} else if (r[ind]===0) t.cont++; }
+    else { const nf=$('cruzNum').value; if (r[nf]!=null){t.soma+=r[nf]; t.cont++;} }
+  });
+  const valor = t => modo==='contagem' ? t.n : (modo==='pct' ? (t.cont?100*t.v/t.cont:null)
+    : (modo==='soma' ? t.soma : (t.cont?t.soma/t.cont:null)));
+  cats.forEach(c=>series.forEach(s=>{cel[c][s].final=valor(cel[c][s]);}));
+
+  /* gráfico */
+  const cap = b?18:24, catsG = cats.slice(0,cap);
+  const datasets = series.map((s,i)=>({label:b?(s||'—'):'Valor',
+    data:catsG.map(c=>cel[c][s].final), backgroundColor:PALETA[i%PALETA.length]}));
+  const unidade = modo==='contagem' ? 'escolas' : (modo==='pct' ? '% das escolas com dado'
+    : (modo==='soma' ? 'soma de '+NUMERICOS[$('cruzNum').value] : 'média de '+NUMERICOS[$('cruzNum').value]));
+  desenha('graficoCruzador',{type:'bar',
+    data:{labels:catsG,datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:!!b,position:'bottom',labels:{boxWidth:12}},
+        tooltip:{callbacks:{label:ctx=>{const t=cel[catsG[ctx.dataIndex]][series[ctx.datasetIndex]]; const v=ctx.parsed.y;
+          return v==null ? ` ${ctx.dataset.label}: sem dado` :
+            ` ${ctx.dataset.label}: ${modo==='contagem'?fmt(v):(modo==='pct'?v.toFixed(1).replace('.',',')+'% ('+fmt(t.cont)+' com dado)':v.toLocaleString('pt-BR',{maximumFractionDigits:1}))}`;}}}},
+      scales:{x:{stacked:cruzEmpilhado&&!!b,ticks:{maxRotation:90,minRotation:0}},
+              y:{stacked:cruzEmpilhado&&!!b,title:{display:true,text:unidade},
+                 ticks:{callback:v=>modo==='pct'?v+'%':fmt(v)}}}}});
+
+  /* tabela cruzada */
+  const fmtc = v => v==null?'—':(modo==='contagem'?fmt(v):(modo==='pct'?v.toFixed(1).replace('.',',')+'%'
+    :v.toLocaleString('pt-BR',{maximumFractionDigits:1})));
+  $('cabecalhoCruzador').innerHTML = `<th>${esc(a.rot)}</th>` +
+    series.map(s=>`<th>${esc(b?String(s):'Nº de escolas')}</th>`).join('') + `<th>Escolas (total)</th>`;
+  let corpo='';
+  cats.forEach(c=>{
+    const tot=series.reduce((t,s)=>t+cel[c][s].n,0);
+    corpo += `<tr><td>${esc(c)}</td>${series.map(s=>`<td>${fmtc(cel[c][s].final)}</td>`).join('')}<td class="num">${fmt(tot)}</td></tr>`;
+  });
+  const totSer = series.map(s=>{const t={n:0,v:0,cont:0,soma:0};
+    cats.forEach(c=>{t.n+=cel[c][s].n; t.v+=cel[c][s].v; t.cont+=cel[c][s].cont; t.soma+=cel[c][s].soma;});
+    return `<td class="num">${fmtc(valor(t))}</td>`;}).join('');
+  corpo += `<tr><td><strong>Total</strong></td>${totSer}<td class="num"><strong>${fmt(arr.length)}</strong></td></tr>`;
+  $('corpoCruzador').innerHTML = corpo;
+
+  ultimoCruzamento = {aRot:a.rot, series, cats, cel, modo};
+  $('notaCruzador').textContent = (b?`Cruzamento de "${a.rot}" por "${b.rot}"`:`Distribuição por "${a.rot}"`)
+    + ` — ${fmt(arr.length)} escolas no recorte atual.`
+    + (cats.length>cap?` O gráfico mostra as ${cap} primeiras linhas; a tabela traz tudo.`:'')
+    + (modo==='pct'?` Percentual calculado sobre as escolas com dado para o indicador.`:'');
+}
+function baixaCruzamento(){
+  if (!ultimoCruzamento) return;
+  const {aRot,series,cats,cel,modo} = ultimoCruzamento;
+  const fmtc = v => v==null?'':(modo==='pct'?v.toFixed(2).replace('.',','):String(Math.round(v*100)/100));
+  const cab=[aRot, ...series.map(s=>s||'—'), 'Escolas (total)'];
+  const linhas=cats.map(c=>[c, ...series.map(s=>fmtc(cel[c][s].final)), series.reduce((t,s)=>t+cel[c][s].n,0)]);
+  baixaArquivo('cruzamento-escolas-quilombolas.csv',
+    '\ufeff'+[cab,...linhas].map(l=>l.map(csvCelula).join(';')).join('\r\n'),'text/csv;charset=utf-8');
+}
+
+/* ==================== EXPORTAÇÃO ==================== */
+function csvCelula(v){ v=v==null?'':String(v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+const sntxt = v => v===1?'Sim':(v===0?'Não':'');
+function baixaArquivo(nome, conteudo, tipo){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([conteudo],{type:tipo}));
+  a.download=nome; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function exportaCSV(dados,nome){
+  const cab=['Escola','Código INEP','Município','UF','Região','Dependência','Localização','Situação',
+            'Internet','Água potável','Energia (rede)','Esgoto (rede)','Salas utilizadas','Etapas ofertadas'];
+  const linhas=dados.map(r=>[r.escola,r.cod,r.municipio,r.uf,r.regiao,DEPS[r.dep],LOCS[r.loc],SITS[r.sit],
+    sntxt(r.internet),sntxt(r.aguaPotavel),sntxt(r.energiaRede),sntxt(r.esgotoRede),r.salas??'',
+    ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>t).join('; ')]);
+  baixaArquivo(nome,'\ufeff'+[cab,...linhas].map(l=>l.map(csvCelula).join(';')).join('\r\n'),'text/csv;charset=utf-8');
+}
+
+/* ==================== ORQUESTRAÇÃO ==================== */
+function atualiza(){
+  aplicaFiltros();
+  $('faixaRecorte').textContent = `Recorte atual: ${fmt(visiveis.length)} escola(s) · ${fmt(contaMunicipios())} município(s) · ${contaUF()} UF`;
+  renderIndicadores(); renderPontos(); renderInfra(); renderDonuts(); renderComparativo();
+  renderEtapas(); renderProfs(); renderTabela(); renderCruzador();
+}
+function addOptions(sel,itens){ itens.forEach(([v,t])=>sel.add(new Option(t,v))); }
+function populaFiltros(){
+  addOptions($('filterRegiao'), ORDEM_REGIAO.filter(x=>DADOS.some(r=>r.regiao===x)).map(v=>[v,v]));
+  addOptions($('filterUF'), [...new Set(DADOS.map(r=>r.uf).filter(Boolean))].sort().map(v=>[v,v]));
+  addOptions($('filterDep'), Object.entries(DEPS).map(([k,v])=>[k,v]));
+  addOptions($('filterLoc'), [['1','Urbana'],['2','Rural']]);
+  addOptions($('filterSit'), Object.entries(SITS).map(([k,v])=>[k,v]));
+  addOptions($('filterEtapa'), ETAPAS.map(([c,r])=>[c,r]));
+  addOptions($('cruzA'), Object.entries(DIM).map(([k,d])=>[k,d.rot]));
+  addOptions($('cruzB'), [['','(nenhuma)']].concat(Object.entries(DIM).map(([k,d])=>[k,d.rot])));
+  addOptions($('cruzInd'), Object.entries(IND).map(([k,v])=>[k,v]));
+  addOptions($('cruzNum'), Object.entries(NUMERICOS).map(([k,v])=>[k,v]));
+}
+function ligaEventos(){
+  ['filterRegiao','filterUF','filterDep','filterLoc','filterSit','filterEtapa'].forEach(id=>{
+    $(id).addEventListener('change',e=>{filtros[id.replace('filter','').toLowerCase()]=e.target.value; pagina=1; atualiza();});
+  });
+  let tb=null;
+  $('filterBusca').addEventListener('input',e=>{clearTimeout(tb); tb=setTimeout(()=>{filtros.busca=e.target.value; pagina=1; atualiza();},250);});
+  $('btnLimpar').addEventListener('click',()=>{
+    Object.keys(filtros).forEach(k=>filtros[k]='');
+    ['filterRegiao','filterUF','filterDep','filterLoc','filterSit','filterEtapa'].forEach(id=>$(id).value='');
+    $('filterBusca').value=''; pagina=1; atualiza();});
+  $('camadaTematica').addEventListener('change',renderPontos);
+  $('btnAjustarMapa').addEventListener('click',()=>{try{mapa.fitBounds(camadaPontos.getBounds(),{padding:[30,30]});}catch(e){}});
+  document.querySelectorAll('#tabelaPrincipal th[data-campo]').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const c=th.dataset.campo;
+      if (ordenacao.campo===c) ordenacao.dir*=-1; else {ordenacao.campo=c; ordenacao.dir=1;}
+      document.querySelectorAll('#tabelaPrincipal th .seta').forEach(s=>s.textContent='');
+      th.querySelector('.seta').textContent = ordenacao.dir>0?'▲':'▼';
+      pagina=1; renderTabela();});
+  });
+  $('btnExportarCSV').addEventListener('click',()=>exportaCSV(visiveis,'escolas-quilombolas-recorte.csv'));
+  $('btnExportarJSON').addEventListener('click',()=>baixaArquivo('escolas-quilombolas-recorte.json',JSON.stringify(visiveis,null,1),'application/json'));
+  $('btnBaixarTudoCSV').addEventListener('click',()=>exportaCSV(DADOS,'escolas-quilombolas-completa.csv'));
+  $('btnBaixarTudoJSON').addEventListener('click',()=>baixaArquivo('escolas-quilombolas-completa.json',JSON.stringify(DADOS,null,1),'application/json'));
+  ['cruzA','cruzB','cruzModo','cruzInd','cruzNum'].forEach(id=>$(id).addEventListener('change',renderCruzador));
+  $('btnEmpilha').addEventListener('click',()=>{cruzEmpilhado=!cruzEmpilhado;
+    $('btnEmpilha').textContent=cruzEmpilhado?'Ver agrupado':'Ver empilhado'; renderCruzador();});
+  $('btnBaixarCruzamento').addEventListener('click',baixaCruzamento);
+}
+
+Chart.defaults.font.family = "'Inter',sans-serif";
+Chart.defaults.color = '#4A4033';
+Chart.defaults.borderColor = '#E4DAC6';
+populaFiltros();
+ligaEventos();
+initMapa();
+atualiza();
+setTimeout(()=>mapa.invalidateSize(),400);
+</script>
+</body>
+</html>
