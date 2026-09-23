@@ -1,29 +1,47 @@
-Escolas Quilombolas em Dados — CONAQ / Coletivo de Educação
-Painel público sobre as escolas localizadas em comunidades quilombolas(microdados do Censo Escolar/INEP), com mapa em camadas, indicadores de infraestrutura e cruzamento de variáveis. Atualização automática semanal.
+# Escolas Quilombolas em Dados — CONAQ / Coletivo de Educação
 
-Como funciona
-O Coletivo mantém a planilha no Google Sheets (mesma estrutura da tabela"Escola" do Censo, com o recorte quilombola), publicada para a web.
-Toda segunda, uma GitHub Action roda , que baixa aplanilha em CSV, limpa os dados, recupera as coordenadas e regenera o.atualizar_dados.pyindex.html
-Se a planilha mudou, o robô commita e o site (GitHub Pages ou Vercel)publica sozinho. Se não mudou, nada é commitado.
-A planilha já está configurada
-O link da planilha publicada já está embutido no (constantes e ). Se um dia a planilha mudar deendereço, basta substituir essas duas linhas no topo do script.atualizar_dados.pyCSV_URLLINK_PLANILHA
+Painel público sobre as escolas localizadas em comunidades quilombolas (microdados do Censo Escolar/INEP), com mapa em camadas, indicadores e cruzamento de variáveis. Atualização automática semanal.
 
-Importante: no Google Sheets, em "Arquivo → Compartilhar → Publicarna web", mantenha marcada a opção "Republicar automaticamente quandohouver alterações". Sem isso, o link CSV continua servindo a versãoantiga mesmo depois de a instituição atualizar a planilha.
+## Estrutura
 
-Testar na sua máquina
-python3 atualizar_dados.py
-Isso gera o . Dê dois cliques nele para abrir no navegador econferir o painel com os dados atuais.index.html
+```
+escolas-quilombolas-em-dados/
+│   atualizar_dados.py
+│   template.html
+│   README.md
+│   (index.html ← gerado pelo script, não criar à mão)
+└── .github/
+    └── workflows/
+        └── atualizacao-semanal.yml
+```
 
-Colocar no ar (GitHub)
-Crie um repositório e suba esta pasta completa (mantendo o caminho)..github/workflows/atualizacao-semanal.yml
-Sem GitHub: Configurações → Ações → permissões gerais de fluxo de trabalho → →marque "Permissões de leitura e escrita".
-Aba Actions → "Atualização semanal" → Run workflow para testar.
-Publique via GitHub Pages (Configurações → Pages, branch main) ou Vercel.
-Se algo mudar na planilha
-Se uma coluna for renomeada, o script avisa no log ("colunas ausentes")em vez de quebrar; ajuste o nome no dicionário, no topo do.CAMPOSatualizar_dados.py
+## Como funciona
 
-Segurança
-Se a planilha vier vazia ou cortada (erro de rede, permissão etc.), oscript aborta e não sobrescreve o painel publicado — ele só publicaquando confirma ter recebido um volume de registros consistente (mínimodefinido em ).MINIMO_REGISTROS
+1. O Coletivo mantém a planilha no Google Sheets (mesma estrutura da tabela "Escola" do Censo, com o recorte quilombola).
+2. Toda segunda, uma GitHub Action roda `atualizar_dados.py`, que baixa a planilha em CSV, limpa, recupera as coordenadas e regenera o `index.html`.
+3. Se a planilha mudou, o robô commita e o site (GitHub Pages ou Vercel) publica sozinho. Se não mudou, nada é commitado.
 
-Estrutura da massa
-escolas-quilombolas-em-dados/├── atualizar_dados.py                  # script de atualização├── template.html                       # painel (base para gerar o index.html)├── index.html                          # gerado pelo script (não editar à mão)└── .github/workflows/atualizacao-semanal.yml
+## Configuração única
+
+1. **Crie a planilha:** no Google Sheets, cole os dados começando na célula A1 (mantenha a linha de cabeçalho com os nomes de coluna do Censo). Deixe apenas UMA aba com os dados.
+2. **Compartilhe como público:** Compartilhar → "Qualquer pessoa com o link" pode visualizar.
+3. **Pegue o `SHEET_ID` e o `GID` da URL:**
+
+   ```
+   https://docs.google.com/spreadsheets/d/<SHEET_ID>/edit#gid=<GID>
+   ```
+
+4. Abra `atualizar_dados.py` e preencha `SHEET_ID`, `GID` e `LINK_PLANILHA`.
+5. Coloque `atualizar_dados.py`, `template.html` e o workflow no repositório.
+6. No GitHub: Configurações → Ações → permissões gerais de fluxo de trabalho → marque "Permissões de leitura e escrita".
+7. Aba Actions → "Atualização semanal" → **Run workflow** para testar.
+
+## Ajustes
+
+- **Coluna renomeada na planilha?** O script avisa no log ("colunas ausentes"); corrija o nome no dicionário `CAMPOS`.
+- **Recorte menor (só um estado)?** Ajuste `MINIMO_REGISTROS`.
+- **Trocar o dia/hora:** linha `- cron:` no workflow (sempre em UTC).
+
+## Segurança
+
+Se a planilha vier vazia/cortada (erro de rede, permissão), o script aborta e não sobrescreve o painel publicado.

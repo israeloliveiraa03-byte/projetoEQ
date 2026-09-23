@@ -5,8 +5,9 @@ atualizar_dados.py — Escolas Quilombolas em Dados (CONAQ · Coletivo de Educa�
 ================================================================================
 
 Baixa a planilha pública do Google Sheets com o recorte quilombola do Censo
-Escolar (tabela "Escola"), limpa os dados, recupera as coordenadas geográficas
-e regenera o index.html do painel a partir de template.html.
+Escolar (tabela "Escola", escolas em comunidades quilombolas), limpa os dados,
+recupera as coordenadas geográficas e regenera o index.html do painel a partir
+de template.html — mesma arquitetura do painel Raizame Dados.
 
 Uso local:
     python3 atualizar_dados.py  (requer apenas internet, sem instalar nada)
@@ -27,23 +28,25 @@ import urllib.request
 from datetime import datetime
 
 # ----------------------------------------------------------------------
-# CONFIGURAÇÃO — já preenchida com a planilha publicada pelo coletivo
+# CONFIGURAÇÃO — preencha quando criar a planilha online (ver README.md)
 # ----------------------------------------------------------------------
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQmkWFZP6JuHSw2GjsquCCwLVhpw0ql0ajb1esJTzk3NUToJZyfaqmMlxXCzxfCuQ/pub?gid=948404274&single=true&output=csv"
-LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQmkWFZP6JuHSw2GjsquCCwLVhpw0ql0ajb1esJTzk3NUToJZyfaqmMlxXCzxfCuQ/pub?gid=948404274&single=true"
+SHEET_ID = "COLE_AQUI_O_ID_DA_PLANILHA"   # docs.google.com/spreadsheets/d/<ESTE_ID>/edit
+GID = "0"                                 # número da aba com os dados (ver README)
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
+LINK_PLANILHA = ""                        # link público da planilha (seção Fontes)
 
 MUNICIPIOS_URL = "https://raw.githubusercontent.com/kelvins/municipios-brasileiros/main/csv/municipios.csv"
 
 TEMPLATE_PATH = "template.html"
 OUTPUT_PATH = "index.html"
 
-SO_QUILOMBOLAS = True      # mantém apenas escolas em comunidade quilombola (TP_LOCALIZACAO_DIFERENCIADA = 3)
-MINIMO_REGISTROS = 100     # trava de segurança contra download quebrado
+SO_QUILOMBOLAS = True      # mantém apenas TP_LOCALIZACAO_DIFERENCIADA = 3
+MINIMO_REGISTROS = 200     # trava de segurança contra download quebrado
 
 # ----------------------------------------------------------------------
 # MAPEAMENTO: coluna do Censo -> campo interno do painel
-# Se a planilha renomear uma coluna, o script avisa no log em vez de quebrar;
-# basta ajustar o nome aqui.
+# Se o INEP/planilha renomear uma coluna, o script avisa no log em vez de
+# quebrar; basta ajustar o nome aqui.
 # ----------------------------------------------------------------------
 CAMPOS = {
     # ----- identificação e localização -----
@@ -252,20 +255,9 @@ def baixa_escolas():
     print(f"Baixando planilha: {CSV_URL}")
     linhas = list(csv.reader(io.StringIO(baixar_texto(CSV_URL))))
     if not linhas:
-        raise RuntimeError("Planilha vazia ou inacessível (confira se ela está publicada).")
+        raise RuntimeError("Planilha vazia ou inacessível (confira se ela está pública).")
 
-    # localiza a linha do cabeçalho (tolera linhas de título acima dos dados)
-    inicio = None
-    for i, linha in enumerate(linhas[:10]):
-        if 'NO_ENTIDADE' in [h.replace('\xa0', ' ').strip() for h in linha]:
-            inicio = i
-            break
-    if inicio is None:
-        raise RuntimeError("Não encontrei o cabeçalho da tabela de Escolas (falta a coluna "
-                           "NO_ENTIDADE). Verifique se a aba publicada é a dos dados e se "
-                           "os nomes das colunas estão na primeira linha.")
-
-    cabecalho = [h.replace('\xa0', ' ').strip() for h in linhas[inicio]]
+    cabecalho = [h.replace('\xa0', ' ').strip() for h in linhas[0]]
     indice, faltando = {}, []
     for coluna, campo in CAMPOS.items():
         if coluna in cabecalho:
@@ -276,13 +268,11 @@ def baixa_escolas():
         print("AVISO: colunas ausentes na planilha (campos ficarão 'sem dado'):")
         for c in faltando:
             print(f"  - {c}")
-
-    # se a coluna de localização diferenciada existir, usamos para filtrar;
-    # se não existir, assumimos que a planilha já é o recorte quilombola
-    tem_loc_dif = indice.get('locDif') is not None
+    if 'NO_ENTIDADE' not in cabecalho:
+        raise RuntimeError("A planilha não parece ser a tabela de Escolas do Censo (falta NO_ENTIDADE).")
 
     registros, excluidas, duplicadas, vistos = [], 0, 0, set()
-    for linha in linhas[inicio + 1:]:
+    for linha in linhas[1:]:
         if not any(c.strip() for c in linha):
             continue
 
@@ -294,9 +284,7 @@ def baixa_escolas():
 
         if bruto('escola') in ('', '*'):
             continue
-        # mantém escolas em comunidade quilombola (3); linhas em branco ficam,
-        # já que a planilha já é o recorte quilombola
-        if SO_QUILOMBOLAS and tem_loc_dif and bruto('locDif') not in ('3', '', '*'):
+        if SO_QUILOMBOLAS and bruto('locDif') != '3':
             excluidas += 1
             continue
         cod = bruto('cod')
@@ -358,7 +346,7 @@ def gera_pagina(registros, sem_geo):
         '__ANO_CENSO__': str(ano),
         '__NAO_GEOCODIFICADOS__': str(sem_geo),
         '__DATA_GERACAO__': datetime.now().strftime('%d/%m/%Y'),
-        '__LINK_PLANILHA__': LINK_PLANILHA,
+        '__LINK_PLANILHA__': LINK_PLANILHA or '#',
     }
     for k, v in subs.items():
         tpl = tpl.replace(k, v)
@@ -376,14 +364,14 @@ def main():
     registros = baixa_escolas()
     if len(registros) < MINIMO_REGISTROS:
         print(f"ERRO: só vieram {len(registros)} registros (mínimo esperado: {MINIMO_REGISTROS}). "
-              f"Abortando sem sobrescrever {OUTPUT_PATH}. Se a planilha publicada é mesmo um recorte "
-              f"menor, ajuste MINIMO_REGISTROS no topo do script.")
+              f"Abortando sem sobrescrever {OUTPUT_PATH}. Se você publicou um recorte menor de propósito, "
+              f"ajuste MINIMO_REGISTROS no topo do script.")
         sys.exit(1)
 
     por_codigo = carrega_municipios()
     sem_geo = geocodifica(registros, por_codigo)
 
-    # remove campos de trabalho e de LGPD (não vão para o JSON público)
+    # remove campos de trabalho (não vão para o JSON público)
     for r in registros:
         for c in ('latTxt', 'lonTxt', 'endereco', 'bairro', 'ufNome') + ACC_BRUTOS:
             r.pop(c, None)
