@@ -6,14 +6,20 @@
 <title>Escolas Quilombolas em Dados · CONAQ</title>
 <meta name="description" content="Painel do Coletivo de Educação da CONAQ sobre as escolas localizadas em comunidades quilombolas: mapa com camadas, indicadores de infraestrutura e cruzamento de variáveis a partir dos microdados do Censo Escolar (INEP).">
 <meta name="theme-color" content="#3B5D42">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Escolas Quilombolas em Dados · CONAQ">
+<meta property="og:description" content="Mapa, indicadores e cruzamento de variáveis sobre as escolas em comunidades quilombolas (Censo Escolar/INEP).">
+<meta name="dados-hash" content="__HASH_DADOS__">
+<meta name="dados-total" content="__TOTAL_BRUTO__">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%233B5D42'/%3E%3Cpath d='M12 21C12 21 4 17.2 4 9.3C4 5.1 7.3 2 12 2C16.7 2 20 5.1 20 9.3C20 17.2 12 21 12 21Z' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
-    :root{--verde:#3B5D42;--verde-escuro:#24382A;--dourado:#B9812F;--terracota:#A85630;--grafite:#2E271F;--texto:#4A4033;--medio:#8A7C68;--claro:#E4DAC6;--fundo:#F4EEDF;--branco:#FFF;--creme:#FBF6EA;--borda:#D9CBAC;--alerta-bg:#FBF0DC;--alerta-borda:#DCAE5C}
+    :root{--verde:#3B5D42;--verde-escuro:#24382A;--dourado:#B9812F;--terracota:#A85630;--grafite:#2E271F;--texto:#4A4033;--medio:#6E624F;--claro:#E4DAC6;--fundo:#F4EEDF;--branco:#FFF;--creme:#FBF6EA;--borda:#D9CBAC;--alerta-bg:#FBF0DC;--alerta-borda:#DCAE5C}
     *{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
     body{font-family:'Inter',-apple-system,sans-serif;background:var(--creme);color:var(--texto);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
@@ -59,7 +65,7 @@
     .bloco-filtros{background:var(--fundo);border-top:1px solid var(--claro);border-bottom:1px solid var(--claro)}
     .faixa-recorte{position:sticky;top:0;z-index:50;background:var(--verde-escuro);color:rgba(255,255,255,.92);font-size:12px;letter-spacing:.03em;text-align:center;padding:8px 16px}
     .camadas-painel{display:flex;gap:20px;align-items:end;flex-wrap:wrap;margin-bottom:16px;padding:16px;background:var(--fundo);border:1px solid var(--claro)}
-    .mapa-wrapper{position:relative;height:560px;border:1px solid var(--claro);background:var(--fundo)}
+    .mapa-wrapper{position:relative;z-index:0;height:560px;border:1px solid var(--claro);background:var(--fundo)}
     #mapa{height:100%;width:100%}
     .mapa-dica{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:400;background:rgba(36,56,42,.88);color:#fff;font-size:11px;padding:6px 12px;border-radius:2px;pointer-events:none;transition:opacity .4s;white-space:nowrap}
     .mapa-legenda{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--medio)}
@@ -138,6 +144,8 @@
         .mapa-wrapper{height:380px}
         section.bloco{padding:32px 0}
     }
+    :focus-visible{outline:2px solid var(--dourado);outline-offset:2px}
+    table.tabela-dados th:focus-visible{outline-offset:-3px}
 </style>
 </head>
 <body>
@@ -263,12 +271,12 @@
         </div>
         <div class="mapa-wrapper">
             <div id="mapa"></div>
-            <div class="mapa-dica" id="mapaDica">Arraste para navegar · use o zoom do mouse</div>
+            <div class="mapa-dica" id="mapaDica">Arraste para navegar · zoom com a rolagem ou pinça</div>
         </div>
         <div class="mapa-legenda" id="legendaMapa"></div>
         <div class="caixa-aviso" style="margin-top:16px;">
             <strong>Nota metodológica do mapa</strong>
-            <span id="notaGeo"></span> As coordenadas vêm da planilha-fonte; quando o valor chega corrompido pela formatação (vírgula decimal lida como separador de milhar), o script de atualização recupera o número original e o valida contra o centróide do município (código IBGE). Quando não há como recuperar, a escola é posicionada no centróide do município. __NAO_GEOCODIFICADOS__ escola(s) ficaram sem localização e não aparecem no mapa — continuam nos gráficos e na tabela.
+            <span id="notaGeo"></span> As coordenadas vêm da planilha-fonte; quando o valor chega corrompido pela formatação (vírgula decimal lida como separador de milhar), o script de atualização recupera o número original e o valida contra o centróide do município (código IBGE). Quando não há como recuperar (ou o valor é incompatível com o município), a escola é posicionada no centróide do município e aparece com marcador tracejado. __NAO_GEOCODIFICADOS__ Escolas sem localização não aparecem no mapa, mas continuam nos gráficos e na tabela.
         </div>
     </div>
 </section>
@@ -283,7 +291,7 @@
                 <p class="descricao">Percentual de escolas do recorte com cada serviço ou dependência, entre as que declararam informação no Censo. Barras em terracota indicam indicadores abaixo de 50%.</p>
             </div>
         </div>
-        <div class="grafico-wrapper" style="height:520px;"><canvas id="graficoInfra"></canvas></div>
+        <div class="grafico-wrapper" style="height:520px;"><canvas id="graficoInfra" role="img" aria-label="Barras: percentual de escolas com cada item de infraestrutura"></canvas></div>
     </div>
 </section>
 
@@ -300,21 +308,21 @@
         <div class="duas-colunas" style="margin-bottom:32px;">
             <div>
                 <p class="descricao" style="margin-bottom:10px;">Dependência administrativa:</p>
-                <div class="mini-grafico"><canvas id="graficoDep"></canvas></div>
+                <div class="mini-grafico"><canvas id="graficoDep" role="img" aria-label="Rosca: escolas por dependência administrativa"></canvas></div>
             </div>
             <div>
                 <p class="descricao" style="margin-bottom:10px;">Localização:</p>
-                <div class="mini-grafico"><canvas id="graficoLoc"></canvas></div>
+                <div class="mini-grafico"><canvas id="graficoLoc" role="img" aria-label="Rosca: escolas urbanas e rurais"></canvas></div>
             </div>
         </div>
         <div class="analise-grid">
             <div>
                 <p class="descricao" style="margin-bottom:10px;">Comparativo por região (percentual dentro de cada uma):</p>
-                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoRegiaoComp"></canvas></div>
+                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoRegiaoComp" role="img" aria-label="Barras: indicadores de infraestrutura por região"></canvas></div>
             </div>
             <div>
                 <p class="descricao" style="margin-bottom:10px;">Etapas de ensino ofertadas (nº de escolas):</p>
-                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoEtapas"></canvas></div>
+                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoEtapas" role="img" aria-label="Barras: número de escolas por etapa de ensino"></canvas></div>
             </div>
         </div>
     </div>
@@ -327,10 +335,10 @@
             <div>
                 <div class="rotulo">Equipe das escolas</div>
                 <h2>Profissionais em atividade</h2>
-                <p class="descricao">Soma dos profissionais declarados no Censo por tipo, no recorte atual. Note a presença (ou ausência) de profissionais de apoio importantes para a educação escolar quilombola.</p>
+                <p class="descricao">Soma dos profissionais escolares não docentes declarados no Censo, por tipo, no recorte atual (professores não entram nesta contagem). Note a presença (ou ausência) de profissionais de apoio importantes para a educação escolar quilombola.</p>
             </div>
         </div>
-        <div class="grafico-wrapper" style="height:460px;"><canvas id="graficoProfs"></canvas></div>
+        <div class="grafico-wrapper" style="height:460px;"><canvas id="graficoProfs" role="img" aria-label="Barras: total de profissionais não docentes por tipo"></canvas></div>
     </div>
 </section>
 
@@ -398,7 +406,7 @@
                 <div class="campo"><label>Gráfico</label><button class="btn-limpar" id="btnEmpilha">Ver agrupado</button></div>
             </div>
             <div class="construtor-resultado">
-                <div class="construtor-grafico"><canvas id="graficoCruzador"></canvas></div>
+                <div class="construtor-grafico"><canvas id="graficoCruzador" role="img" aria-label="Gráfico do cruzamento de variáveis escolhido"></canvas></div>
                 <div class="tabela-scroll" style="max-height:420px;overflow-y:auto;">
                     <table class="tabela-ranking" id="tabelaCruzador">
                         <thead><tr id="cabecalhoCruzador"></tr></thead>
@@ -435,7 +443,7 @@
                 </ul>
                 <div class="caixa-aviso">
                     <strong>Limitações conhecidas</strong>
-                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais — por isso alguns “n” variam entre indicadores. Endereço e telefone das escolas não são exibidos (LGPD). As coordenadas, retiradas dos microdados públicos pelo INEP a partir de 2025, são usadas aqui apenas para a leitura territorial do mapa; quando indisponíveis, a escola é posicionada no centróide do município. O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
+                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais — por isso alguns “n” variam entre indicadores. Endereço e telefone das escolas não são exibidos (LGPD). As coordenadas vêm da planilha-fonte do Coletivo e servem apenas para a leitura territorial do mapa; quando ausentes ou incompatíveis com o município, a escola é posicionada no centróide do município (posição aproximada). O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
                 </div>
             </div>
             <div class="cartao-fonte">
@@ -444,7 +452,7 @@
                 <a class="link-fonte" href="__LINK_PLANILHA__" target="_blank" rel="noopener">↗ Planilha de trabalho completa (Google Sheets)</a>
                 <div class="separador"></div>
                 <div class="lista-download">
-                    <button id="btnBaixarTudoCSV">Base completa em CSV</button>
+                    <button id="btnBaixarTudoCSV">Base completa em CSV (colunas do INEP)</button>
                     <button id="btnBaixarTudoJSON">Base completa em JSON</button>
                 </div>
             </div>
@@ -475,6 +483,11 @@
 <script>
 /* ==================== DADOS E DICCIONÁRIOS ==================== */
 const DADOS = __DATA_JSON__;
+const CAMPOS_INEP = __CAMPOS_JSON__;   // campo interno -> nome da coluna do INEP (usado no CSV completo)
+if (typeof L==='undefined' || typeof Chart==='undefined'){
+  document.body.insertAdjacentHTML('afterbegin','<div class="caixa-aviso" style="margin:16px"><strong>Não foi possível carregar o painel</strong>As bibliotecas de mapa e gráficos não carregaram (conexão instável ou bloqueio de rede). Recarregue a página.</div>');
+  throw new Error('Leaflet/Chart.js indisponíveis');
+}
 const $ = id => document.getElementById(id);
 const fmt = n => (n == null ? 0 : n).toLocaleString('pt-BR');
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -534,7 +547,7 @@ const DIM = {
  ['educAmbiental','Educação ambiental']].forEach(p => DIM[p[0]] = dimBin(p[0], p[1]));
 
 const NUMERICOS = {salas:'Salas de aula utilizadas',salasAcessiveis:'Salas acessíveis',salasClimatizadas:'Salas climatizadas',
-  desktops:'Desktops para alunos',notebooks:'Notebooks para alunos',tablets:'Tablets para alunos',profTotal:'Profissionais (total)'};
+  desktops:'Desktops para alunos',notebooks:'Notebooks para alunos',tablets:'Tablets para alunos',profTotal:'Profissionais não docentes (total)'};
 
 /* ==================== ESTADO ==================== */
 const filtros = {regiao:'',uf:'',dep:'',loc:'',sit:'',etapa:'',busca:''};
@@ -602,8 +615,11 @@ function initMapa(){
   bases['Claro'].addTo(mapa);
   L.control.layers(bases, null, {position:'topright', collapsed:false}).addTo(mapa);
   L.control.scale({imperial:false}).addTo(mapa);
-  camadaPontos = L.layerGroup().addTo(mapa);
+  camadaPontos = L.featureGroup().addTo(mapa);   // featureGroup: só ele tem getBounds()
   mapa.on('click zoomstart', ()=>{ $('mapaDica').style.opacity = 0; });
+}
+function ajustaMapa(){
+  try{ const b = camadaPontos.getBounds(); if (b.isValid()) mapa.fitBounds(b,{padding:[30,30]}); }catch(e){}
 }
 function corPonto(r){
   const t = $('camadaTematica').value;
@@ -624,18 +640,21 @@ function popupEscola(r){
     ['Mat. quilombola', r.matQuilombola===1?'Sim':(r.matQuilombola===0?'Não':null)]
   ].filter(l=>l[1]).map(l=>`<tr><td>${l[0]}</td><td><strong>${l[1]}</strong></td></tr>`).join('');
   const etapas = ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>t).join(', ');
-  return `<strong>${esc(r.escola)}</strong><br>${esc(r.municipio)} (${r.uf})` +
+  return `<strong>${esc(r.escola)}</strong><br>${esc(r.municipio)} (${esc(r.uf)})` +
     `<table class="tabela-popup">${linhas}</table>` +
     (etapas?`<div class="popup-etapas"><b>Oferta:</b> ${etapas}</div>`:'') +
-    `<div class="popup-etapas" style="color:#8A7C68;">cód. INEP ${r.cod||'—'}</div>`;
+    (r.fonteGeo==='municipio'?'<div class="popup-etapas" style="color:#A85630;">Posição aproximada: centróide do município.</div>':'') +
+    `<div class="popup-etapas" style="color:#6E624F;">cód. INEP ${esc(r.cod||'—')}</div>`;
 }
 function renderPontos(){
   camadaPontos.clearLayers();
   visiveis.forEach(r=>{
     if (r.lat==null || r.lon==null) return;
-    const m = L.circleMarker([r.lat,r.lon],{radius:5.5,weight:1,color:'#FBF6EA',fillColor:corPonto(r),fillOpacity:.85});
-    m.bindTooltip(r.escola, {className:'ponto-tooltip'});
-    m.on('click', ()=>{ m.bindPopup(popupEscola(r), {maxWidth:320}).openPopup(); });
+    const aprox = r.fonteGeo==='municipio', cor = corPonto(r);   // aproximado = centróide do município
+    const m = L.circleMarker([r.lat,r.lon],{radius:5.5,weight:aprox?1.5:1,color:aprox?cor:'#FBF6EA',fillColor:cor,
+      fillOpacity:aprox?.3:.85,dashArray:aprox?'2 2':null});
+    m.bindTooltip(esc(r.escola), {className:'ponto-tooltip'});
+    m.bindPopup(()=>popupEscola(r), {maxWidth:320});
     camadaPontos.addLayer(m);
   });
   atualizaLegendaMapa();
@@ -643,11 +662,12 @@ function renderPontos(){
 }
 function atualizaLegendaMapa(){
   const t = $('camadaTematica').value; let itens;
-  if (t==='regiao') itens = ORDEM_REGIAO.map(g=>[CORES_REGIAO[g],g]);
-  else if (t==='dep') itens = Object.values(DEPS).map((n,i)=>[Object.values(CORES_DEP)[i],n]);
+  if (t==='regiao') itens = ORDEM_REGIAO.map(g=>[CORES_REGIAO[g],g]).concat([['#8A7C68','Sem dado']]);
+  else if (t==='dep') itens = Object.values(DEPS).map((n,i)=>[Object.values(CORES_DEP)[i],n]).concat([['#8A7C68','Sem dado']]);
   else if (t==='loc') itens = [['#B9812F','Urbana'],['#3B5D42','Rural'],['#8A7C68','Sem dado']];
   else itens = [['#3B5D42','Sim'],['#A85630','Não'],['#8A7C68','Sem dado']];
-  $('legendaMapa').innerHTML = itens.map(([c,t2])=>`<span class="item"><span class="bolinha" style="background:${c}"></span>${t2}</span>`).join('');
+  $('legendaMapa').innerHTML = itens.map(([c,t2])=>`<span class="item"><span class="bolinha" style="background:${c}"></span>${t2}</span>`).join('') +
+    (visiveis.some(r=>r.fonteGeo==='municipio') ? '<span class="item"><span class="bolinha" style="background:transparent;border:2px dashed #6E624F"></span>Posição aproximada (centróide do município)</span>' : '');
 }
 function atualizaNotaGeo(){
   const a = visiveis.filter(r=>r.fonteGeo==='escola').length, b = visiveis.filter(r=>r.fonteGeo==='municipio').length;
@@ -722,6 +742,7 @@ function etapasDe(r){ return ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>`<span c
 function renderTabela(){
   const lista = [...visiveis].sort((x,y)=>{
     const a=valorOrd(x,ordenacao.campo), b=valorOrd(y,ordenacao.campo);
+    if (a==null && b==null) return 0;
     if (a==null) return 1; if (b==null) return -1;
     if (typeof a==='number' && typeof b==='number') return (a-b)*ordenacao.dir;
     return String(a).localeCompare(String(b),'pt-BR')*ordenacao.dir;
@@ -730,8 +751,8 @@ function renderTabela(){
   if (pagina>paginas) pagina=paginas;
   const ini=(pagina-1)*porPagina, corte=lista.slice(ini,ini+porPagina);
   $('tabelaCorpo').innerHTML = corte.length ? corte.map(r=>`<tr>
-      <td><strong>${esc(r.escola)}</strong><br><span class="celula-vazia">cód. ${r.cod||'—'}</span></td>
-      <td>${esc(r.municipio||'—')}</td><td>${r.uf||'—'}</td>
+      <td><strong>${esc(r.escola)}</strong><br><span class="celula-vazia">cód. ${esc(r.cod||'—')}</span></td>
+      <td>${esc(r.municipio||'—')}</td><td>${esc(r.uf||'—')}</td>
       <td>${DEPS[r.dep]||'—'}</td><td>${LOCS[r.loc]||'—'}</td><td>${SITS[r.sit]||'—'}</td>
       <td>${marca(r.internet)}</td><td>${marca(r.aguaPotavel)}</td><td>${marca(r.energiaRede)}</td><td>${marca(r.esgotoRede)}</td>
       <td>${r.salas!=null?r.salas:'—'}</td><td>${etapasDe(r)}</td></tr>`).join('')
@@ -755,7 +776,9 @@ function renderCruzador(){
   const a=DIM[aK], b=bK?DIM[bK]:null, arr=visiveis;
   $('linhaCruzInd').style.display = modo==='pct' ? '' : 'none';
   $('linhaCruzNum').style.display = (modo==='soma'||modo==='media') ? '' : 'none';
-  if (!arr.length){ $('cabecalhoCruzador').innerHTML=''; $('corpoCruzador').innerHTML=''; return; }
+  if (!arr.length){ $('cabecalhoCruzador').innerHTML=''; $('corpoCruzador').innerHTML='';
+    if (graficos.graficoCruzador){ graficos.graficoCruzador.destroy(); delete graficos.graficoCruzador; }
+    $('notaCruzador').textContent='Nenhuma escola no recorte atual.'; ultimoCruzamento=null; return; }
 
   const contA={}; arr.forEach(r=>{const v=a.fn(r); contA[v]=(contA[v]||0)+1;});
   let cats=Object.keys(contA);
@@ -831,7 +854,7 @@ function baixaCruzamento(){
 }
 
 /* ==================== EXPORTAÇÃO ==================== */
-function csvCelula(v){ v=v==null?'':String(v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function csvCelula(v){ v=v==null?'':String(v); return /[;"\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
 const sntxt = v => v===1?'Sim':(v===0?'Não':'');
 function baixaArquivo(nome, conteudo, tipo){
   const a=document.createElement('a');
@@ -841,11 +864,20 @@ function baixaArquivo(nome, conteudo, tipo){
 }
 function exportaCSV(dados,nome){
   const cab=['Escola','Código INEP','Município','UF','Região','Dependência','Localização','Situação',
-            'Internet','Água potável','Energia (rede)','Esgoto (rede)','Salas utilizadas','Etapas ofertadas'];
+            'Internet','Água potável','Energia (rede)','Esgoto (rede)','Salas utilizadas','Etapas ofertadas',
+            'Latitude','Longitude','Origem da coordenada'];
+  const coord = v => v==null ? '' : String(v).replace('.',',');
   const linhas=dados.map(r=>[r.escola,r.cod,r.municipio,r.uf,r.regiao,DEPS[r.dep],LOCS[r.loc],SITS[r.sit],
     sntxt(r.internet),sntxt(r.aguaPotavel),sntxt(r.energiaRede),sntxt(r.esgotoRede),r.salas??'',
-    ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>t).join('; ')]);
+    ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>t).join('; '),
+    coord(r.lat),coord(r.lon),r.fonteGeo==='escola'?'coordenada da escola':(r.fonteGeo==='municipio'?'centróide do município':'')]);
   baixaArquivo(nome,'\ufeff'+[cab,...linhas].map(l=>l.map(csvCelula).join(';')).join('\r\n'),'text/csv;charset=utf-8');
+}
+
+function exportaCSVCompleto(dados,nome){
+  const chaves = Object.keys(CAMPOS_INEP);
+  const linhas = dados.map(r=>chaves.map(k=>{ const v=r[k]; return v==null ? '' : (typeof v==='number' && !Number.isInteger(v) ? String(v).replace('.',',') : v); }));
+  baixaArquivo(nome,'\ufeff'+[chaves.map(k=>CAMPOS_INEP[k]),...linhas].map(l=>l.map(csvCelula).join(';')).join('\r\n'),'text/csv;charset=utf-8');
 }
 
 /* ==================== ORQUESTRAÇÃO ==================== */
@@ -870,27 +902,33 @@ function populaFiltros(){
 }
 function ligaEventos(){
   ['filterRegiao','filterUF','filterDep','filterLoc','filterSit','filterEtapa'].forEach(id=>{
-    $(id).addEventListener('change',e=>{filtros[id.replace('filter','').toLowerCase()]=e.target.value; pagina=1; atualiza();});
+    $(id).addEventListener('change',e=>{filtros[id.replace('filter','').toLowerCase()]=e.target.value; pagina=1; atualiza();
+      if (id==='filterRegiao' || id==='filterUF') ajustaMapa();});
   });
   let tb=null;
   $('filterBusca').addEventListener('input',e=>{clearTimeout(tb); tb=setTimeout(()=>{filtros.busca=e.target.value; pagina=1; atualiza();},250);});
   $('btnLimpar').addEventListener('click',()=>{
     Object.keys(filtros).forEach(k=>filtros[k]='');
     ['filterRegiao','filterUF','filterDep','filterLoc','filterSit','filterEtapa'].forEach(id=>$(id).value='');
-    $('filterBusca').value=''; pagina=1; atualiza();});
+    $('filterBusca').value=''; pagina=1; atualiza(); ajustaMapa();});
   $('camadaTematica').addEventListener('change',renderPontos);
-  $('btnAjustarMapa').addEventListener('click',()=>{try{mapa.fitBounds(camadaPontos.getBounds(),{padding:[30,30]});}catch(e){}});
+  $('btnAjustarMapa').addEventListener('click',ajustaMapa);
   document.querySelectorAll('#tabelaPrincipal th[data-campo]').forEach(th=>{
-    th.addEventListener('click',()=>{
+    th.tabIndex = 0; th.setAttribute('role','button');           // ordenável também pelo teclado
+    const ordena = ()=>{
       const c=th.dataset.campo;
       if (ordenacao.campo===c) ordenacao.dir*=-1; else {ordenacao.campo=c; ordenacao.dir=1;}
       document.querySelectorAll('#tabelaPrincipal th .seta').forEach(s=>s.textContent='');
       th.querySelector('.seta').textContent = ordenacao.dir>0?'▲':'▼';
-      pagina=1; renderTabela();});
+      pagina=1; renderTabela();
+    };
+    th.addEventListener('click',ordena);
+    th.addEventListener('keydown',e=>{ if (e.key==='Enter' || e.key===' '){ e.preventDefault(); ordena(); } });
   });
+  document.querySelector('#tabelaPrincipal th[data-campo="escola"] .seta').textContent='▲';
   $('btnExportarCSV').addEventListener('click',()=>exportaCSV(visiveis,'escolas-quilombolas-recorte.csv'));
   $('btnExportarJSON').addEventListener('click',()=>baixaArquivo('escolas-quilombolas-recorte.json',JSON.stringify(visiveis,null,1),'application/json'));
-  $('btnBaixarTudoCSV').addEventListener('click',()=>exportaCSV(DADOS,'escolas-quilombolas-completa.csv'));
+  $('btnBaixarTudoCSV').addEventListener('click',()=>exportaCSVCompleto(DADOS,'escolas-quilombolas-completa.csv'));
   $('btnBaixarTudoJSON').addEventListener('click',()=>baixaArquivo('escolas-quilombolas-completa.json',JSON.stringify(DADOS,null,1),'application/json'));
   ['cruzA','cruzB','cruzModo','cruzInd','cruzNum'].forEach(id=>$(id).addEventListener('change',renderCruzador));
   $('btnEmpilha').addEventListener('click',()=>{cruzEmpilhado=!cruzEmpilhado;
