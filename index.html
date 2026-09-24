@@ -113,6 +113,7 @@
     .paginacao button{font-size:12px;font-weight:600;text-transform:uppercase;padding:9px 18px;background:var(--branco);border:1px solid var(--borda);color:var(--grafite);cursor:pointer}
     .paginacao button:hover:not(:disabled){background:var(--verde);border-color:var(--verde);color:#fff}
     .paginacao button:disabled{opacity:.4;cursor:not-allowed}
+    .btn-limpar:disabled{opacity:.45;cursor:not-allowed;background:transparent;color:var(--medio);border-color:var(--borda)}
     .paginacao select{font-size:12px;padding:8px 10px;border:1px solid var(--borda)}
     .estado-vazio{text-align:center;padding:48px 20px;color:var(--medio);font-style:italic}
     .caixa-aviso{background:var(--alerta-bg);border:1px solid var(--alerta-borda);padding:18px 20px;font-size:13px;color:#5C4A1A;margin-top:14px}
@@ -1375,6 +1376,12 @@ function renderCruzador(){
   cats.forEach(c=>series.forEach(s=>{cel[c][s].final=valor(cel[c][s]);}));
 
   /* gráfico */
+  /* Empilhar só faz sentido quando as partes somam um todo: contagens e somas.
+     Percentuais e médias são taxas de grupos diferentes — empilhar "100% das
+     urbanas com EJA" sobre "97,4% das urbanas sem EJA" daria 197,4%, um número
+     que não existe. Por isso o modo é decidido pela medida, não pelo botão. */
+  const podeEmpilhar = !!b && (modo==='contagem' || modo==='soma');
+  const empilhar = podeEmpilhar && cruzEmpilhado;
   const cap = b?18:24, catsG = cats.slice(0,cap);
   const datasets = series.map((s,i)=>({label:b?(s||'—'):'Valor',
     data:catsG.map(c=>cel[c][s].final), backgroundColor:PALETA[i%PALETA.length]}));
@@ -1387,26 +1394,43 @@ function renderCruzador(){
         tooltip:{callbacks:{label:ctx=>{const t=cel[catsG[ctx.dataIndex]][series[ctx.datasetIndex]]; const v=ctx.parsed.y;
           return v==null ? ` ${ctx.dataset.label}: sem dado` :
             ` ${ctx.dataset.label}: ${modo==='contagem'?fmt(v):(modo==='pct'?v.toFixed(1).replace('.',',')+'% ('+fmt(t.cont)+' com dado)':v.toLocaleString('pt-BR',{maximumFractionDigits:1}))}`;}}}},
-      scales:{x:{stacked:cruzEmpilhado&&!!b,ticks:{maxRotation:90,minRotation:0}},
-              y:{stacked:cruzEmpilhado&&!!b,title:{display:true,text:unidade},
+      scales:{x:{stacked:empilhar,ticks:{maxRotation:90,minRotation:0}},
+              y:{stacked:empilhar,title:{display:true,text:unidade},
+                 max:(modo==='pct'&&!empilhar)?100:undefined,
                  ticks:{callback:v=>modo==='pct'?v+'%':fmt(v)}}}}});
 
   /* tabela cruzada */
   const fmtc = v => v==null?'—':(modo==='contagem'?fmt(v):(modo==='pct'?v.toFixed(1).replace('.',',')+'%'
     :v.toLocaleString('pt-BR',{maximumFractionDigits:1})));
+  /* Percentual sem denominador engana: "100%" sobre 31 escolas e sobre 2 escolas
+     aparecem iguais na tabela. Em % e média, a célula mostra também o n. */
+  const celula = t => {
+    const v = fmtc(t.final);
+    if (t.final==null) return '<span class="celula-vazia">—</span>';
+    if (modo==='pct')   return `${v} <span class="celula-vazia">(${fmt(t.v)}/${fmt(t.cont)})</span>`;
+    if (modo==='media') return `${v} <span class="celula-vazia">(n=${fmt(t.cont)})</span>`;
+    return v;
+  };
   $('cabecalhoCruzador').innerHTML = `<th>${esc(a.rot)}</th>` +
     series.map(s=>`<th>${esc(b?String(s):'Nº de escolas')}</th>`).join('') + `<th>Escolas (total)</th>`;
   let corpo='';
   cats.forEach(c=>{
     const tot=series.reduce((t,s)=>t+cel[c][s].n,0);
-    corpo += `<tr><td>${esc(c)}</td>${series.map(s=>`<td>${fmtc(cel[c][s].final)}</td>`).join('')}<td class="num">${fmt(tot)}</td></tr>`;
+    corpo += `<tr><td>${esc(c)}</td>${series.map(s=>`<td>${celula(cel[c][s])}</td>`).join('')}<td class="num">${fmt(tot)}</td></tr>`;
   });
   const totSer = series.map(s=>{const t={n:0,v:0,cont:0,soma:0};
     cats.forEach(c=>{t.n+=cel[c][s].n; t.v+=cel[c][s].v; t.cont+=cel[c][s].cont; t.soma+=cel[c][s].soma;});
-    return `<td class="num">${fmtc(valor(t))}</td>`;}).join('');
+    t.final = valor(t); return `<td class="num">${celula(t)}</td>`;}).join('');
   corpo += `<tr><td><strong>Total</strong></td>${totSer}<td class="num"><strong>${fmt(arr.length)}</strong></td></tr>`;
   $('corpoCruzador').innerHTML = corpo;
 
+  const btn = $('btnEmpilha');
+  btn.disabled = !podeEmpilhar;
+  btn.textContent = !b ? 'Empilhar (precisa de duas variáveis)'
+    : (!podeEmpilhar ? 'Empilhar não cabe nesta medida'
+    : (cruzEmpilhado ? 'Ver agrupado' : 'Ver empilhado'));
+  btn.title = podeEmpilhar ? '' :
+    'Só dá para empilhar contagens e somas, em que as partes formam um total. Percentuais e médias são taxas de grupos diferentes.';
   ultimoCruzamento = {aRot:a.rot, series, cats, cel, modo};
   $('notaCruzador').textContent = (b?`Cruzamento de "${a.rot}" por "${b.rot}"`:`Distribuição por "${a.rot}"`)
     + ` — ${fmt(arr.length)} escolas no recorte atual.`
@@ -1521,8 +1545,7 @@ function ligaEventos(){
   $('btnBaixarTudoCSV').addEventListener('click',()=>exportaCSVCompleto(DADOS,'escolas-quilombolas-completa.csv'));
   $('btnBaixarTudoJSON').addEventListener('click',()=>baixaArquivo('escolas-quilombolas-completa.json',JSON.stringify(DADOS,null,1),'application/json'));
   ['cruzA','cruzB','cruzModo','cruzInd','cruzNum'].forEach(id=>$(id).addEventListener('change',renderCruzador));
-  $('btnEmpilha').addEventListener('click',()=>{cruzEmpilhado=!cruzEmpilhado;
-    $('btnEmpilha').textContent=cruzEmpilhado?'Ver agrupado':'Ver empilhado'; renderCruzador();});
+  $('btnEmpilha').addEventListener('click',()=>{cruzEmpilhado=!cruzEmpilhado; renderCruzador();});
   $('btnBaixarCruzamento').addEventListener('click',baixaCruzamento);
   ['compIndicador','compQuebra'].forEach(id=>$(id).addEventListener('change',renderComparacao));
   ['corrX','corrY','corrUnidade','corrSeries','corrMinimo'].forEach(id=>$(id).addEventListener('change',renderCorrelacao));
