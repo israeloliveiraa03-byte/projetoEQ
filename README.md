@@ -18,17 +18,20 @@ escolas-quilombolas-em-dados/
 
 ## Como gerar o painel
 
-**1. Baixe os microdados** em [gov.br/inep → microdados do Censo Escolar](https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-escolar). Dentro do ZIP, em `dados/`, você precisa de duas tabelas:
+**1. Baixe os microdados** em [gov.br/inep → microdados do Censo Escolar](https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-escolar). Dentro do ZIP, em `dados/`, você precisa de até três tabelas:
 
 - `Tabela_Escola_AAAA.csv` — obrigatória
-- `Tabela_Turma_AAAA.csv` — opcional, mas é ela que traz o EJA
+- `Tabela_Turma_AAAA.csv` — opcional; traz as turmas, e é o que sustenta as etapas ofertadas e o EJA
+- `Tabela_Matricula_AAAA.csv` — opcional; traz os alunos, com cor/raça, turno, faixa etária e transporte escolar
 
 > **Atenção à versão da tabela de Escola.** Existem duas: a completa (`Tabela_Escola_AAAA.csv`, 302 colunas) e a anonimizada (`Tabela_Escola_AAAA_V2.csv`, 290 colunas). Só a **completa** traz `LATITUDE` e `LONGITUDE` (colunas AH e AI). Com a `_V2`, o painel funciona igual, mas o mapa agrupa todas as escolas por município. Use a completa se quiser o mapa detalhado.
 
 **2. Rode o script**, com os dois CSVs na mesma pasta que ele:
 
 ```
-python3 atualizar_dados.py --escola Tabela_Escola_2025.csv --turma Tabela_Turma_2025.csv
+python3 atualizar_dados.py --escola    Tabela_Escola_2025.csv \
+                           --turma     Tabela_Turma_2025.csv \
+                           --matricula Tabela_Matricula_2025.csv
 ```
 
 **3. Abra o `index.html`** no navegador para conferir e publique-o (GitHub Pages, Vercel, ou qualquer lugar que sirva um arquivo estático).
@@ -42,6 +45,7 @@ Precisa apenas de Python 3.9 ou mais novo — nada para instalar. A primeira exe
 | `--saida painel.html` | gerar com outro nome, sem sobrescrever o publicado |
 | `--so-quilombolas` | carregar só o código 3 (painel menor, sem comparação entre tipos) |
 | `--coordenadas arquivo.csv` | usar coordenadas de outra fonte, no lugar das da tabela (veja abaixo) |
+| omitir `--turma` ou `--matricula` | gerar um painel menor; as seções correspondentes se desativam sozinhas |
 
 ## Como o mapa lida com a localização
 
@@ -99,20 +103,28 @@ A tabela completa também traz `DS_ENDERECO`, `NU_ENDERECO`, `DS_COMPLEMENTO`, `
 | Infraestrutura | % de escolas do recorte com cada serviço ou dependência |
 | Comparação entre tipos | Como a escola quilombola se compara à indígena, à de assentamento e às de outros povos tradicionais |
 | EJA | Turmas de EJA efetivamente abertas, por etapa, turno e tipo de território |
+| **Quem são os alunos** | Matrículas: cor/raça declarada, faixa etária, turno, transporte escolar, alunos por turma |
 | Correlação | Duas variáveis ao mesmo tempo, com reta de tendência, r de Pearson e R² |
 | Tabela | Relação das escolas, ordenável, com download da seleção |
 | Cruzador | Tabela cruzada de qualquer par de dimensões |
 
 Os botões de download estão em dois lugares: na seção **Relação das escolas** (a seleção filtrada, em CSV ou JSON) e na seção **Fontes** (a base completa, com os nomes de coluna do INEP).
 
-## As duas tabelas do Censo
+## As três tabelas do Censo
 
-O painel cruza as duas pelo código da escola (`CO_ENTIDADE`):
+O painel cruza as três pelo código da escola (`CO_ENTIDADE`) — as três têm uma linha por escola:
 
-- **Tabela de Escola** — infraestrutura, dependência, localização, e a declaração de que a escola oferece EJA (`IN_EJA`, sim/não).
-- **Tabela de Turma** — quantas turmas de EJA foram efetivamente abertas (`QT_TUR_EJA*`), por etapa e turno.
+| Tabela | O que traz | Unidade |
+|---|---|---|
+| **Escola** | infraestrutura, dependência, localização, modalidades declaradas | a escola |
+| **Turma** | turmas abertas por etapa e turno | a **turma** |
+| **Matrícula** | alunos por etapa, cor/raça, sexo, turno, faixa etária, transporte | o **aluno** |
 
-A segunda é o que dá o tamanho real da oferta: a de Escola só diz que a modalidade existe, não quantas turmas. Sem `--turma`, o painel funciona e a seção de EJA fica vazia.
+A distinção importa. A tabela de Escola diz que a modalidade *existe*; a de Turma diz *quantas turmas*; a de Matrícula diz *quantos alunos*. Uma escola pode declarar EJA, abrir duas turmas e ter dezoito alunos — são três respostas diferentes para a mesma pergunta, e o painel mostra as três.
+
+Cruzar Turma com Matrícula é o que produz as razões — alunos por turma, por sala, por profissional —, que é onde mora a condição de ensino. Nenhum desses números existe pronto no Censo.
+
+Sem `--turma` ou sem `--matricula` o painel funciona: as seções correspondentes se desativam e avisam na tela.
 
 ## Universo carregado
 
@@ -139,7 +151,11 @@ Para o arquivo único não ficar impraticável, os dados vão em **formato colun
 | Colunar simples | 4,3 MB | 407 KB |
 | **Colunar como está no script** | **3,0 MB** | **392 KB** |
 
-O ganho vem de não repetir o nome de cada campo 12.472 vezes, de guardar os 70 campos sim/não como uma string de um caractere por escola, e de trocar texto repetido (região, UF, município) por dicionário + índices. O painel remonta as linhas ao abrir, em cerca de 1 segundo.
+(Medido antes de entrarem localidade e matrículas; com as três tabelas o arquivo fica em 4,6 MB, ou 0,83 MB servido.)
+
+O ganho vem de não repetir o nome de cada campo 12.472 vezes, de guardar os 70 campos sim/não como uma string de um caractere por escola, e de trocar texto repetido (região, UF, município) por dicionário + índices. O painel remonta as linhas ao abrir, em cerca de 1,5 segundo.
+
+Há um segundo princípio no mesmo espírito: **não guardar o que dá para calcular.** Campos como `QT_MAT_INF` (= creche + pré-escola), `QT_TUR_FUND` (= anos iniciais + anos finais), o total masculino (= total − feminino) e as razões alunos/turma saem do arquivo e são recompostos pelo painel ao abrir. São cerca de 440 KB a menos, sem perder um número sequer — conferido contra os CSVs do INEP em 12.469 escolas, zero divergência.
 
 ## Ajustes
 
@@ -191,6 +207,8 @@ Por isso o painel marca essas escolas com o chip **multisseriada** em vez de fin
 - **Etapas ofertadas:** derivadas da tabela de Turma (ao menos uma turma aberta na etapa). Veja a correção acima.
 - **Turmas de EJA:** somas da tabela de Turma. As etapas (fundamental anos iniciais, anos finais, médio) **não** somam o total: cursos FIC e técnicos integrados à EJA entram no total e não nessas etapas — em 2025, 300 das 2.100 turmas quilombolas. Já os recortes de turno (noturno, diurno, EAD) somam o total exatamente, mas são as mesmas turmas vistas de outro ângulo e não devem ser somados às etapas.
 - **Coordenadas:** vêm das colunas `LATITUDE`/`LONGITUDE` da tabela completa de Escola e são validadas contra o envelope da UF; as escolas sem coordenada entram no círculo do município. Veja a seção sobre o mapa, acima.
+- **Cor/raça:** as cinco categorias do IBGE, declaradas pelo aluno ou responsável na matrícula. O percentual é calculado sobre quem declarou — no recorte quilombola de 2025, 87,9% das matrículas. O Censo **não tem categoria "quilombola"** para cor/raça, então o que o painel mostra é como essa população aparece nas categorias disponíveis, não uma medida de pertencimento.
+- **Razões (alunos por turma, sala, profissional):** calculadas escola por escola e depois promediadas entre escolas — não é o total de alunos dividido pelo total de turmas. A pergunta é sobre a escola típica, e a média das razões responde isso; a razão dos totais deixaria as escolas grandes dominarem.
 - **Privacidade:** endereço, CEP e telefone existem na tabela completa, mas não são lidos nem republicados.
 
 ## Como ler a correlação

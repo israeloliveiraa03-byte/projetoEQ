@@ -374,6 +374,34 @@
     </div>
 </section>
 
+<!-- QUEM SÃO OS ALUNOS -->
+<section class="bloco" id="alunos">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Matrículas</div>
+                <h2>Quem são os alunos</h2>
+                <p class="descricao">Até aqui o painel contou escolas e turmas. Esta seção conta <strong>alunos</strong>, da tabela de Matrícula do Censo: quantos são, como se declaram, em que turno estudam e quantos dependem de transporte escolar para chegar.</p>
+            </div>
+        </div>
+        <div class="indicadores-grid" id="indicadoresAlunos"></div>
+        <div class="analise-grid" style="margin-top:28px;">
+            <div>
+                <p class="descricao" style="margin-bottom:10px;">Cor/raça declarada, por tipo de território (ignora o filtro de tipo):</p>
+                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoRaca" role="img" aria-label="Barras: composição de cor/raça das matrículas por tipo de território"></canvas></div>
+            </div>
+            <div>
+                <p class="descricao" style="margin-bottom:10px;">Faixa etária dos alunos, no recorte atual:</p>
+                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoIdade" role="img" aria-label="Barras: alunos por faixa etária"></canvas></div>
+            </div>
+        </div>
+        <div class="caixa-aviso" style="margin-top:16px;">
+            <strong>Como ler a cor/raça</strong>
+            <span id="notaRaca"></span> A declaração é feita pelo aluno ou responsável no ato da matrícula, com as categorias do IBGE — o Censo Escolar não tem categoria "quilombola" para cor/raça. Por isso o que se vê aqui é como a população quilombola aparece <em>nas categorias disponíveis</em>, não uma medida de pertencimento. Matrículas sem declaração ficam fora do percentual e são mostradas à parte.
+        </div>
+    </div>
+</section>
+
 <!-- CORRELAÇÃO -->
 <section class="bloco" id="correlacao">
     <div class="container">
@@ -638,6 +666,22 @@ const DADOS = (() => {
       for (let i = 0; i < n; i++) { const v = col[i]; if (v != null) linhas[i][campo] = v; }
     }
   }
+  /* Campos que o gerador não guarda porque são reconstituíveis a partir dos que
+     estão aqui. Recompor custa uma passada; guardar custaria ~440 KB no arquivo. */
+  const soma = (r, ...cs) => cs.some(c=>r[c]!=null) ? cs.reduce((t,c)=>t+(r[c]||0),0) : null;
+  const razao = (a, b) => (a!=null && b) ? a/b : null;
+  for (const r of linhas) {
+    r.turInf  = soma(r,'turCreche','turPre');
+    r.turFund = soma(r,'turFundAI','turFundAF');
+    r.matInf  = soma(r,'matCreche','matPre');
+    r.matFund = soma(r,'matFundAI','matFundAF');
+    r.matMasc = (r.matTotal!=null && r.matFem!=null) ? r.matTotal - r.matFem : null;
+    r.matComRaca   = soma(r,'matBranca','matPreta','matParda','matAmarela','matIndigenaRaca');
+    r.matPretaParda = soma(r,'matPreta','matParda');
+    r.alunosPorTurma = razao(r.matTotal, r.turTotal);
+    r.alunosPorSala  = razao(r.matTotal, r.salas);
+    r.alunosPorProf  = razao(r.matTotal, r.profTotal);
+  }
   return linhas;
 })();
 const CAMPOS_INEP = __CAMPOS_JSON__;   // campo interno -> nome da coluna do INEP (usado no CSV completo)
@@ -745,7 +789,28 @@ const NUMERICOS = {salas:'Salas de aula utilizadas',salasAcessiveis:'Salas acess
   turFundAF:'Turmas de fund. anos finais',turMed:'Turmas de ensino médio',
   turInf:'Turmas de educação infantil',turCreche:'Turmas de creche',turPre:'Turmas de pré-escola',
   turProf:'Turmas de educação profissional',
-  turFundAFMulti:'Turmas multisseriadas (anos finais)',turFundAIMulti:'Turmas multietapa (infantil + fundamental)'};
+  turFundAFMulti:'Turmas multisseriadas (anos finais)',turFundAIMulti:'Turmas multietapa (infantil + fundamental)',
+  /* ---- matrículas (tabela de Matrícula do Censo) ---- */
+  matTotal:'Alunos (matrículas na educação básica)',
+  matCreche:'Alunos em creche',matPre:'Alunos em pré-escola',matInf:'Alunos na educação infantil',
+  matFundAI:'Alunos em fund. anos iniciais',matFundAF:'Alunos em fund. anos finais',
+  matFund:'Alunos no ensino fundamental',matMed:'Alunos no ensino médio',
+  matProf:'Alunos na educação profissional',matEsp:'Alunos da educação especial',
+  matEja:'Alunos em EJA',matEjaFund:'Alunos em EJA – fundamental',matEjaMed:'Alunos em EJA – médio',
+  matEjaNoturno:'Alunos em EJA – noturno',matEjaDiurno:'Alunos em EJA – diurno',
+  matPreta:'Alunos de cor/raça preta',matParda:'Alunos de cor/raça parda',
+  matBranca:'Alunos de cor/raça branca',matAmarela:'Alunos de cor/raça amarela',
+  matIndigenaRaca:'Alunos de cor/raça indígena',matSemDeclaracao:'Alunos sem cor/raça declarada',
+  matPretaParda:'Alunos pretos e pardos',matComRaca:'Alunos com cor/raça declarada',
+  matFem:'Alunas',matMasc:'Alunos (masculino)',
+  matDiurno:'Alunos no diurno',matNoturno:'Alunos no noturno',matEad:'Alunos em EAD',matIntegral:'Alunos em tempo integral',
+  mat0a3:'Alunos de até 3 anos',mat4a5:'Alunos de 4 a 5 anos',mat6a10:'Alunos de 6 a 10 anos',
+  mat11a14:'Alunos de 11 a 14 anos',mat15a17:'Alunos de 15 a 17 anos',mat18mais:'Alunos de 18 anos ou mais',
+  transporte:'Alunos que usam transporte escolar',
+  transporteEstadual:'Transporte escolar sob responsabilidade do estado',
+  transporteMunicipal:'Transporte escolar sob responsabilidade do município',
+  alunosPorTurma:'Alunos por turma',alunosPorSala:'Alunos por sala de aula',
+  alunosPorProf:'Alunos por profissional não docente'};
 
 /* Variáveis para o gráfico de correlação. Campos binários entram como
    "% de escolas com…" quando os pontos são municípios ou UF. */
@@ -790,11 +855,18 @@ const contaMunicipios = () => new Set(visiveis.filter(r=>r.ibge).map(r=>r.ibge))
 const contaUF = () => new Set(visiveis.filter(r=>r.uf).map(r=>r.uf)).size;
 
 /* ==================== INDICADORES ==================== */
+const mediaPorEscola = alunos => {
+  const n = visiveis.filter(r=>r.matTotal!=null).length;
+  return n ? `média de ${(alunos/n).toFixed(0)} por escola` : '';
+};
 function renderIndicadores(){
   const pA=pct('aguaPotavel',visiveis), pE=pct('energiaRede',visiveis), pI=pct('internet',visiveis),
         pS=pct('esgotoRede',visiveis), pAc=pct('acess',visiveis), pM=pct('matQuilombola',visiveis);
+  const alunos = visiveis.reduce((t,r)=>t+(r.matTotal||0),0);
+  const temMat = visiveis.some(r=>r.matTotal!=null);
   const cartoes = [
     [fmt(visiveis.length),'Escolas no recorte',`de ${fmt(DADOS.length)} no total`],
+    ...(temMat ? [[fmt(alunos),'Alunos matriculados', mediaPorEscola(alunos)]] : []),
     [fmt(contaMunicipios()),'Municípios',`${contaUF()} UF`],
     [pctTxt(pA),'Com água potável',notaN(pA)],
     [pctTxt(pE),'Com energia da rede',notaN(pE)],
@@ -1083,6 +1155,72 @@ function renderComparacao(){
       ? `Média de "${NUMERICOS[campo]}" entre as escolas que informaram o campo.`
       : `Percentual de escolas com "${IND[campo]||campo}", calculado sobre as que declararam 0 ou 1 no Censo.`)
     + ` ${fmt(arr.length)} escolas nos quatro tipos, com os demais filtros aplicados.`;
+}
+
+/* ==================== QUEM SÃO OS ALUNOS ==================== */
+const CORES_RACA = {matPreta:'#3B5D42',matParda:'#B9812F',matBranca:'#C9BFA8',
+                    matAmarela:'#A85630',matIndigenaRaca:'#4C1D95'};
+const ORDEM_RACA = ['matPreta','matParda','matBranca','matAmarela','matIndigenaRaca'];
+
+function renderAlunos(){
+  const temMat = visiveis.some(r=>r.matTotal!=null);
+  if (!temMat){                                   // painel gerado sem --matricula
+    $('indicadoresAlunos').innerHTML = '<div class="indicador"><div class="nota">Esta base foi gerada sem a tabela de Matrícula do Censo, então não há contagem de alunos.</div></div>';
+    ['graficoRaca','graficoIdade'].forEach(id=>{ if (graficos[id]){ graficos[id].destroy(); delete graficos[id]; } });
+    $('notaRaca').textContent=''; return;
+  }
+  const S = c => visiveis.reduce((t,r)=>t+(r[c]||0),0);
+  const alunos = S('matTotal'), comRaca = S('matComRaca'), pretaParda = S('matPretaParda');
+  const transp = S('transporte'), noturno = S('matNoturno');
+  // média das razões por escola, não razão dos totais: a pergunta é sobre a escola típica
+  const medias = c => { const v = visiveis.map(r=>r[c]).filter(x=>x!=null);
+    return v.length ? v.reduce((t,x)=>t+x,0)/v.length : null; };
+  const apt = medias('alunosPorTurma');
+  const cartoes = [
+    [fmt(alunos),'Alunos matriculados', `em ${fmt(visiveis.filter(r=>r.matTotal!=null).length)} escolas`],
+    [apt==null?'—':apt.toFixed(1).replace('.',','),'Alunos por turma','média entre as escolas'],
+    [comRaca?`${(100*pretaParda/comRaca).toFixed(1).replace('.',',')}%`:'—','Pretos e pardos',`de ${fmt(comRaca)} com declaração`],
+    [alunos?`${(100*transp/alunos).toFixed(1).replace('.',',')}%`:'—','Usam transporte escolar',`${fmt(transp)} alunos`],
+    [alunos?`${(100*noturno/alunos).toFixed(1).replace('.',',')}%`:'—','Estudam à noite',`${fmt(noturno)} alunos`],
+    [fmt(S('matEja')),'Alunos em EJA', alunos?`${(100*S('matEja')/alunos).toFixed(1).replace('.',',')}% do total`:''],
+  ];
+  $('indicadoresAlunos').innerHTML = cartoes.map(c=>
+    `<div class="indicador"><div class="valor">${c[0]}</div><div class="rotulo">${c[1]}</div>${c[2]?`<div class="nota">${c[2]}</div>`:''}</div>`).join('');
+
+  /* cor/raça por tipo de território — percentual sobre quem declarou */
+  const base = baseComparacao();
+  const tipos = ORDEM_TIPO.filter(t=>base.some(r=>r.locDif===t && r.matComRaca!=null));
+  const porTipo = tipos.map(t=>{
+    const g = base.filter(r=>r.locDif===t);
+    const decl = g.reduce((s,r)=>s+(r.matComRaca||0),0);
+    const o = {t, decl, sem:g.reduce((s,r)=>s+(r.matSemDeclaracao||0),0)};
+    ORDEM_RACA.forEach(c=>o[c] = decl ? 100*g.reduce((s,r)=>s+(r[c]||0),0)/decl : null);
+    return o;
+  });
+  desenha('graficoRaca',{type:'bar',
+    data:{labels:porTipo.map(p=>TIPOS_CURTO[p.t]),
+      datasets:ORDEM_RACA.map(c=>({label:(NUMERICOS[c]||c).replace('Alunos de cor/raça ',''),
+        backgroundColor:CORES_RACA[c], data:porTipo.map(p=>p[c])}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.parsed.y==null?'sem dado':ctx.parsed.y.toFixed(1).replace('.',',')+'%'}`,
+          footer:items=>`${fmt(porTipo[items[0].dataIndex].decl)} matrículas com declaração`}}},
+      scales:{x:{stacked:true},y:{stacked:true,max:100,ticks:{callback:v=>v+'%'}}}}});
+
+  /* faixa etária */
+  const faixas=[['mat0a3','Até 3'],['mat4a5','4 a 5'],['mat6a10','6 a 10'],
+                ['mat11a14','11 a 14'],['mat15a17','15 a 17'],['mat18mais','18 ou +']];
+  const vals=faixas.map(([c,rot])=>({rot,n:S(c)}));
+  desenha('graficoIdade',{type:'bar',
+    data:{labels:vals.map(v=>v.rot),datasets:[{data:vals.map(v=>v.n),backgroundColor:'#3B5D42'}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.parsed.y)} alunos` +
+        (alunos?` (${(100*c.parsed.y/alunos).toFixed(1).replace('.',',')}%)`:'')}}},
+      scales:{y:{beginAtZero:true,title:{display:true,text:'alunos'}}}}});
+
+  const sem = S('matSemDeclaracao');
+  $('notaRaca').textContent = `No recorte atual, ${fmt(comRaca)} de ${fmt(alunos)} matrículas têm cor/raça declarada` +
+    (sem ? `; ${fmt(sem)} (${(100*sem/alunos).toFixed(1).replace('.',',')}%) não têm.` : '.');
 }
 
 /* ==================== CORRELAÇÃO ====================
@@ -1465,11 +1603,15 @@ function exportaCSV(dados,nome){
   const cab=['Escola','Código INEP','Localidade (endereço declarado)','Tipo de território','Município','UF','Região','Dependência','Localização','Situação',
             'Internet','Água potável','Energia (rede)','Esgoto (rede)','Salas utilizadas',
             'Turmas (total)','Turmas de EJA','Turmas de EJA – fundamental','Turmas de EJA – médio','Turmas de EJA – noturno',
+            'Alunos (total)','Alunos por turma','Alunos em EJA','Alunos no noturno',
+            'Alunos pretos e pardos','Alunos com cor/raça declarada','Alunos com transporte escolar',
             'Etapas ofertadas','Turma multisseriada','Latitude','Longitude','Origem da coordenada'];
   const coord = v => v==null ? '' : String(v).replace('.',',');
   const linhas=dados.map(r=>[r.escola,r.cod,r.localidade,TIPOS[r.locDif],r.municipio,r.uf,r.regiao,DEPS[r.dep],LOCS[r.loc],SITS[r.sit],
     sntxt(r.internet),sntxt(r.aguaPotavel),sntxt(r.energiaRede),sntxt(r.esgotoRede),r.salas??'',
     r.turTotal??'',r.turEja??'',r.turEjaFund??'',r.turEjaMed??'',r.turEjaNoturno??'',
+    r.matTotal??'',r.alunosPorTurma==null?'':r.alunosPorTurma.toFixed(2).replace('.',','),
+    r.matEja??'',r.matNoturno??'',r.matPretaParda??'',r.matComRaca??'',r.transporte??'',
     etapasOfertadas(r).join('; '), r.multisseriada==null?'':(r.multisseriada===1?'Sim':'Não'),
     coord(r.lat),coord(r.lon),r.fonteGeo==='escola'?'coordenada da escola':(r.fonteGeo==='municipio'?'centróide do município':'')]);
   baixaArquivo(nome,'\ufeff'+[cab,...linhas].map(l=>l.map(csvCelula).join(';')).join('\r\n'),'text/csv;charset=utf-8');
@@ -1485,7 +1627,7 @@ function exportaCSVCompleto(dados,nome){
 function atualiza(){
   aplicaFiltros();
   $('faixaRecorte').textContent = `Recorte atual: ${fmt(visiveis.length)} escola(s) · ${fmt(contaMunicipios())} município(s) · ${contaUF()} UF`;
-  renderIndicadores(); renderPontos(); renderInfra(); renderComparacao(); renderEja();
+  renderIndicadores(); renderPontos(); renderInfra(); renderComparacao(); renderEja(); renderAlunos();
   renderCorrelacao(); renderDonuts(); renderComparativo();
   renderEtapas(); renderProfs(); renderTabela(); renderCruzador();
 }

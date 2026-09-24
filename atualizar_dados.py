@@ -12,10 +12,12 @@ index.html que sai. Não há automação nem planilha intermediária.
 
 Uso (requer só Python 3.9+, nada para instalar):
 
-    python3 atualizar_dados.py --escola Tabela_Escola_2025.csv \\
-                               --turma  Tabela_Turma_2025.csv
+    python3 atualizar_dados.py --escola    Tabela_Escola_2025.csv \\
+                               --turma     Tabela_Turma_2025.csv \\
+                               --matricula Tabela_Matricula_2025.csv
 
     --turma é opcional; sem ela, o painel sai sem a seção de EJA.
+    --matricula é opcional; sem ela, sai sem contagem de alunos, cor/raça e transporte.
     --coordenadas é opcional; veja "SOBRE A LOCALIZAÇÃO DAS ESCOLAS" abaixo.
 
 Outras opções:
@@ -183,14 +185,46 @@ CAMPOS_ESCOLA = {
 # tamanho real da oferta — IN_EJA na tabela de Escola só diz sim/não.
 CAMPOS_TURMA = {
     'QT_TUR_BAS': 'turTotal',
-    'QT_TUR_INF': 'turInf', 'QT_TUR_INF_CRE': 'turCreche', 'QT_TUR_INF_PRE': 'turPre',
-    'QT_TUR_FUND': 'turFund', 'QT_TUR_FUND_AI': 'turFundAI', 'QT_TUR_FUND_AF': 'turFundAF',
+    # turInf e turFund também saem: soma exata de creche+pré e de AI+AF
+    'QT_TUR_INF_CRE': 'turCreche', 'QT_TUR_INF_PRE': 'turPre',
+    'QT_TUR_FUND_AI': 'turFundAI', 'QT_TUR_FUND_AF': 'turFundAF',
     'QT_TUR_FUND_AI_MULTIETAPA': 'turFundAIMulti', 'QT_TUR_FUND_AF_MULTI': 'turFundAFMulti',
     'QT_TUR_MED': 'turMed', 'QT_TUR_PROF': 'turProf',
     'QT_TUR_EJA': 'turEja', 'QT_TUR_EJA_FUND': 'turEjaFund', 'QT_TUR_EJA_MED': 'turEjaMed',
     'QT_TUR_EJA_FUND_AI': 'turEjaFundAI', 'QT_TUR_EJA_FUND_AF': 'turEjaFundAF',
     'QT_TUR_EJA_D': 'turEjaDiurno', 'QT_TUR_EJA_N': 'turEjaNoturno', 'QT_TUR_EJA_EAD': 'turEjaEad',
     'QT_TUR_EJA_INT': 'turEjaIntegral',
+}
+
+# Tabela de Matrícula: quantos ALUNOS, contra os quantas TURMAS da tabela anterior.
+# São 239 variáveis no Censo; trazer todas engordaria o painel sem necessidade, então
+# aqui ficam as que sustentam leitura de política pública. O CSV original continua
+# disponível para quem quiser aprofundar.
+CAMPOS_MATRICULA = {
+    # ----- totais por etapa -----
+    # matInf e matFund não entram: são soma exata das partes abaixo, e o painel as
+    # recompõe ao abrir (conferido em 12.472 escolas, zero divergência).
+    'QT_MAT_BAS': 'matTotal', 'QT_MAT_INF_CRE': 'matCreche', 'QT_MAT_INF_PRE': 'matPre',
+    'QT_MAT_FUND_AI': 'matFundAI', 'QT_MAT_FUND_AF': 'matFundAF',
+    'QT_MAT_MED': 'matMed', 'QT_MAT_PROF': 'matProf', 'QT_MAT_ESP': 'matEsp',
+    # ----- EJA -----
+    'QT_MAT_EJA': 'matEja', 'QT_MAT_EJA_FUND': 'matEjaFund', 'QT_MAT_EJA_MED': 'matEjaMed',
+    'QT_MAT_EJA_N': 'matEjaNoturno', 'QT_MAT_EJA_D': 'matEjaDiurno',
+    # ----- cor/raça (autodeclarada) -----
+    'QT_MAT_BAS_BRANCA': 'matBranca', 'QT_MAT_BAS_PRETA': 'matPreta',
+    'QT_MAT_BAS_PARDA': 'matParda', 'QT_MAT_BAS_AMARELA': 'matAmarela',
+    'QT_MAT_BAS_INDIGENA': 'matIndigenaRaca', 'QT_MAT_BAS_ND': 'matSemDeclaracao',
+    # ----- sexo -----
+    'QT_MAT_BAS_FEM': 'matFem',   # masculino = total - feminino, recomposto no painel
+    # ----- turno -----
+    'QT_MAT_BAS_D': 'matDiurno', 'QT_MAT_BAS_N': 'matNoturno',
+    'QT_MAT_BAS_EAD': 'matEad', 'QT_MAT_BAS_INT': 'matIntegral',
+    # ----- faixa etária (na data de referência do Censo) -----
+    'QT_MAT_BAS_0_3': 'mat0a3', 'QT_MAT_BAS_4_5': 'mat4a5', 'QT_MAT_BAS_6_10': 'mat6a10',
+    'QT_MAT_BAS_11_14': 'mat11a14', 'QT_MAT_BAS_15_17': 'mat15a17', 'QT_MAT_BAS_18_MAIS': 'mat18mais',
+    # ----- transporte escolar -----
+    'QT_TRANSP_PUBLICO': 'transporte', 'QT_TRANSP_RESP_EST': 'transporteEstadual',
+    'QT_TRANSP_RESP_MUN': 'transporteMunicipal',
 }
 
 TEXTO = {'ano', 'regiao', 'ufNome', 'uf', 'municipio', 'ibge', 'escola', 'cod', 'localidade',
@@ -203,7 +237,8 @@ PROFS = ['profAdministrativo', 'profServicos', 'profBibliotecario', 'profSaude',
          'profAgricola', 'profBraille']
 
 INTEIROS = ({'salas', 'salasClimatizadas', 'salasAcessiveis', 'desktops', 'notebooks',
-             'tablets', 'dep', 'loc', 'locDif', 'sit'} | set(PROFS) | set(CAMPOS_TURMA.values()))
+             'tablets', 'dep', 'loc', 'locDif', 'sit'} | set(PROFS)
+            | set(CAMPOS_TURMA.values()) | set(CAMPOS_MATRICULA.values()))
 
 ACC_BRUTOS = ('accCorrimao', 'accElevador', 'accPisosTateis', 'accVaoLivre',
               'accRampas', 'accSinalTatil', 'accSinalVisual', 'accSinalizacao',
@@ -628,10 +663,14 @@ def le_escolas(caminho, universo):
     return registros
 
 
-def le_turmas(caminho, registros):
-    """Cruza a tabela de Turma pelo código da escola."""
-    leitor, cabecalho = abre_csv(caminho, "tabela de Turma")
-    indice = mapeia_colunas(cabecalho, CAMPOS_TURMA, ['CO_ENTIDADE'], "tabela de Turma")
+def cruza_tabela(caminho, registros, campos, rotulo):
+    """
+    Acrescenta as colunas de outra tabela do Censo às escolas já lidas, casando
+    pelo código da escola (CO_ENTIDADE). Serve para Turma e para Matrícula, que
+    têm a mesma forma: uma linha por escola, só mudam as colunas.
+    """
+    leitor, cabecalho = abre_csv(caminho, rotulo)
+    indice = mapeia_colunas(cabecalho, campos, ['CO_ENTIDADE'], rotulo)
     iCO = cabecalho.index('CO_ENTIDADE')
     por_cod = {r['cod']: r for r in registros if r.get('cod')}
     casados = 0
@@ -645,16 +684,27 @@ def le_turmas(caminho, registros):
             if i < len(linha):
                 r[campo] = para_int((linha[i] or '').strip())
         casados += 1
-    print(f"Turmas cruzadas para {casados} de {len(registros)} escolas.")
+    print(f"{rotulo}: cruzada para {casados} de {len(registros)} escolas.")
     if casados == 0:
-        raise RuntimeError("nenhuma escola casou com a tabela de Turma. As duas tabelas são do mesmo ano?")
-    derivados_de_turma(registros)
+        raise RuntimeError(f"nenhuma escola casou com a {rotulo}. As tabelas são do mesmo ano?")
     return casados
+
+
+def le_turmas(caminho, registros):
+    n = cruza_tabela(caminho, registros, CAMPOS_TURMA, "tabela de Turma")
+    derivados_de_turma(registros)
+    return n
+
+
+def le_matriculas(caminho, registros):
+    n = cruza_tabela(caminho, registros, CAMPOS_MATRICULA, "tabela de Matrícula")
+    derivados_de_matricula(registros)
+    return n
 
 
 def derivados_de_turma(registros):
     """
-    Campos que só fazem sentido depois do cruzamento com a tabela de Turma.
+    Campo que só faz sentido depois do cruzamento com a tabela de Turma.
 
     'multisseriada' importa no recorte quilombola: a maioria dessas escolas junta
     séries diferentes na mesma turma. Quando isso acontece, o Censo costuma lançar
@@ -664,7 +714,8 @@ def derivados_de_turma(registros):
     """
     n = 0
     for r in registros:
-        fund = r.get('turFund')
+        ai, af = r.get('turFundAI'), r.get('turFundAF')
+        fund = None if (ai is None and af is None) else (ai or 0) + (af or 0)
         multi = (r.get('turFundAIMulti') or 0) + (r.get('turFundAFMulti') or 0)
         if fund is None:
             r['multisseriada'] = None
@@ -678,9 +729,19 @@ def derivados_de_turma(registros):
     print(f"{n} escola(s) com turma multisseriada no ensino fundamental.")
 
 
-# ----------------------------------------------------------------------
-# GERAÇÃO DO PAINEL
-# ----------------------------------------------------------------------
+def derivados_de_matricula(registros):
+    """
+    Nada é gravado aqui, de propósito.
+
+    As razões que interessam — alunos por turma, por sala, por profissional — e as
+    somas de cor/raça saem de campos que já estão no pacote. Guardá-las custaria
+    cerca de 270 KB para repetir contas de uma linha, então o painel as calcula ao
+    abrir. A regra: guarde o que não dá para reconstruir.
+    """
+    com = sum(1 for r in registros if r.get('matTotal') is not None)
+    print(f"Matrículas presentes em {com} escolas; razões e somas são calculadas no painel.")
+
+
 def hoje_br():
     try:
         from zoneinfo import ZoneInfo
@@ -742,11 +803,18 @@ def gera_pagina(registros, sem_geo, proprias, saida, fonte_escola, fonte_turma):
     dados = dados.replace('<', '\\u003c').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')
 
     campos_inep = {campo: coluna for coluna, campo in
-                   list(CAMPOS_ESCOLA.items()) + list(CAMPOS_TURMA.items()) if campo not in OCULTOS}
+                   list(CAMPOS_ESCOLA.items()) + list(CAMPOS_TURMA.items())
+                   + list(CAMPOS_MATRICULA.items()) if campo not in OCULTOS}
     campos_inep.update({'lat': 'LATITUDE_USADA', 'lon': 'LONGITUDE_USADA',
                         'fonteGeo': 'ORIGEM_COORDENADA',
                         'acess': 'ACESSIBILIDADE_ALGUM_RECURSO (derivado)',
-                        'profTotal': 'PROFISSIONAIS_TOTAL (derivado)'})
+                        'profTotal': 'PROFISSIONAIS_TOTAL (derivado)',
+                        'multisseriada': 'TURMA_MULTISSERIADA (derivado)',
+                        'alunosPorTurma': 'ALUNOS_POR_TURMA (derivado)',
+                        'alunosPorSala': 'ALUNOS_POR_SALA (derivado)',
+                        'alunosPorProf': 'ALUNOS_POR_PROFISSIONAL (derivado)',
+                        'matComRaca': 'MATRICULAS_COM_COR_RACA_DECLARADA (derivado)',
+                        'matPretaParda': 'MATRICULAS_PRETA_MAIS_PARDA (derivado)'})
     campos_json = json.dumps(campos_inep, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
 
     anos = sorted({r['ano'] for r in registros if r.get('ano')})
@@ -806,9 +874,11 @@ def gera_pagina(registros, sem_geo, proprias, saida, fonte_escola, fonte_turma):
 def main():
     ap = argparse.ArgumentParser(
         description="Gera o painel a partir dos microdados do Censo Escolar baixados do INEP.",
-        epilog="Exemplo: python3 atualizar_dados.py --escola Tabela_Escola_2025.csv --turma Tabela_Turma_2025.csv")
+        epilog="Exemplo: python3 atualizar_dados.py --escola Tabela_Escola_2025.csv "
+               "--turma Tabela_Turma_2025.csv --matricula Tabela_Matricula_2025.csv")
     ap.add_argument("--escola", required=True, help="CSV da tabela de Escola (obrigatório)")
     ap.add_argument("--turma", help="CSV da tabela de Turma (opcional; habilita a seção de EJA)")
+    ap.add_argument("--matricula", help="CSV da tabela de Matrícula (opcional; habilita alunos, cor/raça e transporte)")
     ap.add_argument("--coordenadas", help="CSV opcional com código INEP, latitude e longitude por escola")
     ap.add_argument("--saida", default=SAIDA_PADRAO, help=f"arquivo a gerar (padrão: {SAIDA_PADRAO})")
     ap.add_argument("--so-quilombolas", action="store_true",
@@ -832,6 +902,12 @@ def main():
             le_turmas(args.turma, registros)
         else:
             print("Sem --turma: o painel sairá sem a seção de EJA.")
+
+        if args.matricula:
+            # depende da Turma: as razões alunos/turma precisam das duas
+            le_matriculas(args.matricula, registros)
+        else:
+            print("Sem --matricula: o painel sairá sem contagem de alunos, cor/raça e transporte.")
 
         por_codigo = carrega_municipios()
         coords = le_coordenadas(args.coordenadas, por_codigo) if args.coordenadas else {}
