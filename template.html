@@ -9,8 +9,6 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Escolas Quilombolas em Dados · CONAQ">
 <meta property="og:description" content="Mapa, indicadores e cruzamento de variáveis sobre as escolas em comunidades quilombolas (Censo Escolar/INEP).">
-<meta name="dados-hash" content="__HASH_DADOS__">
-<meta name="dados-total" content="__TOTAL_BRUTO__">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%233B5D42'/%3E%3Cpath d='M12 21C12 21 4 17.2 4 9.3C4 5.1 7.3 2 12 2C16.7 2 20 5.1 20 9.3C20 17.2 12 21 12 21Z' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -93,6 +91,11 @@
     table.tabela-dados th:last-child{border-right:none}
     table.tabela-dados th .seta{opacity:.5;margin-left:4px;font-size:10px}
     table.tabela-dados td{padding:12px 16px;border-bottom:1px solid var(--claro);border-right:1px solid var(--claro);vertical-align:top}
+    /* nomes de escola quilombola são longos ("ANEXO COLEGIO ESTADUAL ... COMUNIDADE
+       QUILOMBOLA"): sem largura mínima a coluna quebra em dez linhas e a tabela vira
+       uma escada. */
+    table.tabela-dados td:first-child,table.tabela-dados th:first-child{min-width:230px}
+    table.tabela-dados td:last-child{min-width:200px}
     table.tabela-dados td:last-child{border-right:none}
     table.tabela-dados tbody tr:nth-child(even){background:var(--fundo)}
     table.tabela-dados tbody tr:hover{background:#EEF2F0}
@@ -144,6 +147,7 @@
         .mapa-wrapper{height:380px}
         section.bloco{padding:32px 0}
     }
+    section.bloco[id]{scroll-margin-top:56px}   /* a faixa de recorte é sticky: âncoras param abaixo dela */
     :focus-visible{outline:2px solid var(--dourado);outline-offset:2px}
     table.tabela-dados th:focus-visible{outline-offset:-3px}
 </style>
@@ -185,13 +189,14 @@
             <div class="header-titulos">
                 <h1>Escolas Quilombolas em Dados</h1>
                 <p class="subtitulo-nome">Observatório das escolas em comunidades quilombolas</p>
-                <p class="subtitulo">Um painel do Coletivo de Educação da CONAQ para monitorar as condições de funcionamento, a infraestrutura e a oferta de ensino das escolas localizadas em comunidades quilombolas, a partir dos microdados do Censo Escolar (INEP). Reúne mapa com camadas, indicadores e uma ferramenta de cruzamento de variáveis — sem precisar lidar com planilha dinâmica.</p>
+                <p class="subtitulo">Um painel do Coletivo de Educação da CONAQ para monitorar as condições de funcionamento, a infraestrutura e a oferta de ensino — inclusive de EJA — das escolas localizadas em comunidades quilombolas, a partir dos microdados do Censo Escolar (INEP). Reúne mapa com camadas, indicadores, comparação com os demais territórios diferenciados, análise de correlação e uma ferramenta de cruzamento de variáveis — sem precisar lidar com planilha dinâmica.</p>
             </div>
         </div>
         <div class="header-meta">
-            <span><strong>Última atualização da base:</strong> __DATA_GERACAO__</span>
-            <span><strong>Fonte primária:</strong> Censo Escolar __ANO_CENSO__ — INEP</span>
-            <span><strong>Registros:</strong> __TOTAL_ESCOLAS__ escolas · __TOTAL_MUNICIPIOS__ municípios · __TOTAL_UFS__ UF</span>
+            <span><strong>Página gerada em:</strong> __DATA_GERACAO__</span>
+            <span><strong>Fonte:</strong> microdados do Censo Escolar __ANO_CENSO__ — INEP</span>
+            <span><strong>Escolas quilombolas:</strong> __TOTAL_ESCOLAS__ · __TOTAL_MUNICIPIOS__ municípios · __TOTAL_UFS__ UF</span>
+            <span><strong>Base para comparação:</strong> __TOTAL_UNIVERSO__ escolas em território diferenciado</span>
         </div>
     </div>
 </header>
@@ -217,10 +222,11 @@
             <div>
                 <div class="rotulo">Comece por aqui</div>
                 <h2>Filtre o recorte que quer estudar</h2>
-                <p class="descricao">Os filtros valem para a página inteira: mapa, indicadores, gráficos, tabela e cruzamentos mudam juntos.</p>
+                <p class="descricao">Os filtros valem para a página inteira: mapa, indicadores, gráficos, tabela e cruzamentos mudam juntos. O painel abre no recorte quilombola — troque o <strong>tipo de território</strong> para ver outro recorte, ou escolha “todos” para comparar. As seções de <a href="#comparacao">comparação</a> e <a href="#correlacao">correlação</a> mostram os quatro tipos lado a lado, independentemente deste filtro.</p>
             </div>
         </div>
         <div class="filtros">
+            <div class="campo"><label for="filterTipo">Tipo de território</label><select id="filterTipo"></select></div>
             <div class="campo"><label for="filterRegiao">Região</label><select id="filterRegiao"><option value="">Todas</option></select></div>
             <div class="campo"><label for="filterUF">UF</label><select id="filterUF"><option value="">Todas</option></select></div>
             <div class="campo"><label for="filterDep">Dependência administrativa</label><select id="filterDep"><option value="">Todas</option></select></div>
@@ -241,13 +247,14 @@
             <div>
                 <div class="rotulo">Distribuição territorial</div>
                 <h2>Mapa das escolas quilombolas</h2>
-                <p class="descricao">Cada ponto é uma escola. Troque o fundo do mapa no seletor do canto superior direito (claro, ruas, satélite ou relevo) e escolha a camada temática para mudar a cor dos pontos. Clique em um ponto para ver a ficha da escola.</p>
+                <p class="descricao">Escolas que declararam coordenada ao Censo aparecem como <strong>pontos</strong>, na posição informada. As demais entram num <strong>círculo por município</strong>, tanto maior quanto mais escolas ele reúne — é a localização que existe para elas. Clique em qualquer símbolo para ver a ficha. Troque o fundo do mapa no seletor do canto superior direito (claro, ruas, satélite ou relevo) e use a camada temática para mudar a cor.</p>
             </div>
         </div>
         <div class="camadas-painel">
             <div class="campo">
-                <label for="camadaTematica">Camada temática (cor dos pontos)</label>
+                <label for="camadaTematica">Camada temática (cor dos círculos)</label>
                 <select id="camadaTematica">
+                    <option value="tipo">Tipo de território</option>
                     <option value="regiao">Região do país</option>
                     <option value="dep">Dependência administrativa</option>
                     <option value="loc">Urbana / Rural</option>
@@ -276,7 +283,7 @@
         <div class="mapa-legenda" id="legendaMapa"></div>
         <div class="caixa-aviso" style="margin-top:16px;">
             <strong>Nota metodológica do mapa</strong>
-            <span id="notaGeo"></span> As coordenadas vêm da planilha-fonte; quando o valor chega corrompido pela formatação (vírgula decimal lida como separador de milhar), o script de atualização recupera o número original e o valida contra o centróide do município (código IBGE). Quando não há como recuperar (ou o valor é incompatível com o município), a escola é posicionada no centróide do município e aparece com marcador tracejado. __NAO_GEOCODIFICADOS__ Escolas sem localização não aparecem no mapa, mas continuam nos gráficos e na tabela.
+            __NOTA_GEO__ <span id="notaGeo"></span> A coordenada é declarada pela própria escola ao Censo e não é conferida em campo; use-a como indicação, não como levantamento fundiário. Um <strong>círculo</strong> fica no centróide do município, não no endereço de nenhuma escola: quanto maior, mais escolas ele reúne, e a posição dentro do município é arbitrária. Cada coordenada é validada contra o território da própria UF antes de entrar no mapa — o centróide do município não serve para isso, porque há municípios amazônicos maiores que países inteiros. Escolas sem localização não aparecem no mapa, mas continuam nos gráficos e na tabela.
         </div>
     </div>
 </section>
@@ -292,6 +299,126 @@
             </div>
         </div>
         <div class="grafico-wrapper" style="height:520px;"><canvas id="graficoInfra" role="img" aria-label="Barras: percentual de escolas com cada item de infraestrutura"></canvas></div>
+    </div>
+</section>
+
+<!-- COMPARAÇÃO ENTRE TIPOS DE TERRITÓRIO -->
+<section class="bloco" id="comparacao">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Escola quilombola em perspectiva</div>
+                <h2>Comparação entre tipos de território</h2>
+                <p class="descricao">Todas as escolas em área de localização diferenciada, lado a lado: quilombola, terra indígena, assentamento e demais povos e comunidades tradicionais. Esta seção <strong>ignora o filtro de tipo</strong> — é ele que se quer comparar —, mas respeita os filtros de região, UF, dependência e busca.</p>
+            </div>
+        </div>
+        <div class="camadas-painel">
+            <div class="campo">
+                <label for="compIndicador">Indicador comparado</label>
+                <select id="compIndicador"></select>
+            </div>
+            <div class="campo">
+                <label for="compQuebra">Quebrar por</label>
+                <select id="compQuebra">
+                    <option value="">Nada (só o tipo)</option>
+                    <option value="regiao">Região</option>
+                    <option value="uf">UF</option>
+                    <option value="dep">Dependência administrativa</option>
+                    <option value="loc">Urbana / Rural</option>
+                </select>
+            </div>
+        </div>
+        <div class="grafico-wrapper" style="height:380px;"><canvas id="graficoComparacao" role="img" aria-label="Barras comparando o indicador entre tipos de território"></canvas></div>
+        <div class="tabela-scroll" style="margin-top:8px;">
+            <table class="tabela-ranking" id="tabelaComparacao">
+                <thead><tr id="cabecalhoComparacao"></tr></thead>
+                <tbody id="corpoComparacao"></tbody>
+            </table>
+        </div>
+        <div class="nota-metodo" id="notaComparacao"></div>
+    </div>
+</section>
+
+<!-- EJA -->
+<section class="bloco" id="eja">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Educação de Jovens e Adultos</div>
+                <h2>Oferta de EJA nas escolas do recorte</h2>
+                <p class="descricao">Aqui a medida são as <strong>turmas efetivamente abertas</strong>, da tabela de Turma do Censo — e não apenas a declaração de que a escola oferece a modalidade. Uma escola pode declarar EJA e ter poucas turmas; o número de turmas mostra o tamanho real da oferta.</p>
+            </div>
+        </div>
+        <div class="indicadores-grid" id="indicadoresEja"></div>
+        <div class="analise-grid" style="margin-top:28px;">
+            <div>
+                <p class="descricao" style="margin-bottom:10px;">Turmas de EJA por tipo de território (ignora o filtro de tipo):</p>
+                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoEjaTipo" role="img" aria-label="Barras: turmas de EJA por tipo de território"></canvas></div>
+            </div>
+            <div>
+                <p class="descricao" style="margin-bottom:10px;">Turmas de EJA por turno e etapa, no recorte atual:</p>
+                <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoEjaTurno" role="img" aria-label="Barras: turmas de EJA por turno e etapa"></canvas></div>
+            </div>
+        </div>
+        <div class="caixa-aviso" style="margin-top:16px;">
+            <strong>Como ler</strong>
+            <span id="notaEja"></span>
+        </div>
+    </div>
+</section>
+
+<!-- CORRELAÇÃO -->
+<section class="bloco" id="correlacao">
+    <div class="container">
+        <div class="secao-cabecalho">
+            <div>
+                <div class="rotulo">Duas variáveis ao mesmo tempo</div>
+                <h2>Correlação com linha de tendência</h2>
+                <p class="descricao">Escolha duas variáveis e veja se elas andam juntas. Cada ponto é um município, uma UF ou uma escola, conforme a unidade escolhida; a reta é a regressão linear e o R² diz quanto da variação de Y a reta explica.</p>
+            </div>
+        </div>
+        <div class="camadas-painel">
+            <div class="campo"><label for="corrX">Eixo X</label><select id="corrX"></select></div>
+            <div class="campo"><label for="corrY">Eixo Y</label><select id="corrY"></select></div>
+            <div class="campo">
+                <label for="corrUnidade">Cada ponto é</label>
+                <select id="corrUnidade">
+                    <option value="municipio">Um município</option>
+                    <option value="uf">Uma UF</option>
+                    <option value="escola">Uma escola</option>
+                </select>
+            </div>
+            <div class="campo">
+                <label for="corrSeries">Separar por</label>
+                <select id="corrSeries">
+                    <option value="tipo">Tipo de território</option>
+                    <option value="">Nada (série única)</option>
+                    <option value="regiao">Região</option>
+                    <option value="dep">Dependência administrativa</option>
+                </select>
+            </div>
+            <div class="campo"><label for="corrMinimo">Mínimo de escolas por ponto <span id="corrMinimoNota" style="font-weight:400;text-transform:none;letter-spacing:0"></span></label>
+                <select id="corrMinimo">
+                    <option value="3">3</option><option value="1">1 (todos)</option>
+                    <option value="5">5</option><option value="10">10</option>
+                </select>
+            </div>
+        </div>
+        <div class="grafico-wrapper" style="height:460px;"><canvas id="graficoCorrelacao" role="img" aria-label="Dispersão das duas variáveis escolhidas, com linha de tendência"></canvas></div>
+        <div class="tabela-scroll" style="margin-top:8px;">
+            <table class="tabela-ranking" id="tabelaCorrelacao">
+                <thead><tr><th>Série</th><th>Pontos</th><th>r (Pearson)</th><th>R²</th><th>Reta</th><th>Leitura</th></tr></thead>
+                <tbody id="corpoCorrelacao"></tbody>
+            </table>
+        </div>
+        <div class="nota-metodo" id="notaCorrelacao"></div>
+        <div class="barra-acoes">
+            <button class="btn-primario" id="btnBaixarCorrelacao">Baixar os pontos deste gráfico (CSV)</button>
+        </div>
+        <div class="caixa-aviso" style="margin-top:14px;">
+            <strong>Cuidado na leitura</strong>
+            Correlação não é causa: duas variáveis podem subir juntas por efeito de uma terceira (o porte do município, por exemplo). Com poucos pontos, um único município atípico move a reta inteira — por isso o filtro de mínimo de escolas por ponto. Variáveis do tipo sim/não viram <em>percentual de escolas com o item</em> quando o ponto é município ou UF; na unidade “uma escola” elas valem 0 ou 1, o que empilha os pontos em duas linhas e torna a reta pouco informativa.
+        </div>
     </div>
 </section>
 
@@ -321,8 +448,9 @@
                 <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoRegiaoComp" role="img" aria-label="Barras: indicadores de infraestrutura por região"></canvas></div>
             </div>
             <div>
-                <p class="descricao" style="margin-bottom:10px;">Etapas de ensino ofertadas (nº de escolas):</p>
+                <p class="descricao" style="margin-bottom:10px;">Etapas de ensino ofertadas (nº de escolas), medidas pelas turmas que a escola abriu:</p>
                 <div class="stacked-wrapper" style="height:320px;"><canvas id="graficoEtapas" role="img" aria-label="Barras: número de escolas por etapa de ensino"></canvas></div>
+                <div class="nota-metodo" id="notaEtapas"></div>
             </div>
         </div>
     </div>
@@ -343,13 +471,13 @@
 </section>
 
 <!-- TABELA -->
-<section class="bloco">
+<section class="bloco" id="tabela">
     <div class="container">
         <div class="secao-cabecalho">
             <div>
                 <div class="rotulo">Registros</div>
                 <h2>Relação das escolas</h2>
-                <p class="descricao">Escolas que atendem aos filtros. Clique no cabeçalho de uma coluna para ordenar.</p>
+                <p class="descricao">Escolas que atendem aos filtros. Clique no cabeçalho de uma coluna para ordenar. A coluna de etapas lista o que a escola de fato oferece, pelas turmas abertas; a marca <span class="chip-etapa" style="border-color:#B9812F;color:#8A6520">multisseriada</span> indica que a escola junta séries diferentes numa mesma turma.</p>
             </div>
         </div>
         <div class="barra-acoes">
@@ -360,6 +488,7 @@
             <table class="tabela-dados" id="tabelaPrincipal">
                 <thead><tr>
                     <th data-campo="escola">Escola<span class="seta"></span></th>
+                    <th data-campo="locDif">Território<span class="seta"></span></th>
                     <th data-campo="municipio">Município<span class="seta"></span></th>
                     <th data-campo="uf">UF<span class="seta"></span></th>
                     <th data-campo="dep">Dependência<span class="seta"></span></th>
@@ -370,6 +499,7 @@
                     <th data-campo="energiaRede">Energia<span class="seta"></span></th>
                     <th data-campo="esgotoRede">Esgoto<span class="seta"></span></th>
                     <th data-campo="salas">Salas<span class="seta"></span></th>
+                    <th data-campo="turEja">Turmas EJA<span class="seta"></span></th>
                     <th>Etapas ofertadas</th>
                 </tr></thead>
                 <tbody id="tabelaCorpo"></tbody>
@@ -434,23 +564,24 @@
         </div>
         <div class="fontes-grid">
             <div class="fontes-texto">
-                <p><strong>De onde vêm os dados.</strong> Os microdados do Censo Escolar da Educação Básica (__ANO_CENSO__) são produzidos pelo INEP. Este painel usa a tabela “Escola”, recortada para as escolas com localização diferenciada em comunidade quilombola (TP_LOCALIZACAO_DIFERENCIADA = 3) — categoria declarada pela própria escola no ato do censo. O recorte completo do Censo também distingue áreas de assentamento, terras indígenas e áreas de povos e comunidades tradicionais; aqui cobrimos o recorte quilombola.</p>
-                <p><strong>Como a base é mantida.</strong> A planilha que alimenta o painel é mantida e atualizada pelo Coletivo de Educação da CONAQ a partir dos microdados públicos. A atualização desta página é automática (semanal): quando a planilha muda, o painel se regenera sozinho.</p>
+                <p><strong>De onde vêm os dados.</strong> Os microdados do Censo Escolar da Educação Básica (__ANO_CENSO__) são produzidos pelo INEP e são públicos. Este painel cruza duas tabelas do Censo pelo código da escola: a tabela <em>Escola</em>, de onde vêm infraestrutura, dependência e localização, e a tabela <em>Turma</em>, de onde vêm as turmas efetivamente abertas — inclusive as de EJA. O recorte é o de localização diferenciada (TP_LOCALIZACAO_DIFERENCIADA), categoria declarada pela própria escola: além da comunidade quilombola (código 3), o painel carrega terra indígena, área de assentamento e demais povos e comunidades tradicionais, para permitir a comparação.</p>
+                <p><strong>Como esta página foi feita.</strong> Ela foi gerada a partir dos arquivos <em>__ARQUIVOS_FONTE__</em>, baixados da página de microdados do INEP, em __DATA_GERACAO__. Não há atualização automática nem banco de dados: quem mantém o painel baixa os microdados do ano, roda o script de geração e publica o arquivo que sai. O Censo é anual, então a base muda uma vez por ano.</p>
                 <ul>
-                    <li>Consulte os microdados oficiais do Censo Escolar na página do INEP.</li>
-                    <li>Abra a planilha de trabalho completa para auditar, filtrar e cruzar os dados originais.</li>
-                    <li>Baixe os dados diretamente desta página em CSV ou JSON, respeitando os filtros aplicados.</li>
+                    <li>Consulte os microdados oficiais do Censo Escolar na página do INEP, ao lado.</li>
+                    <li>Baixe os dados desta página em CSV ou JSON — a seleção filtrada ou a base completa com os nomes de coluna do INEP.</li>
+                    <li>Confira qualquer número recalculando a partir dos microdados originais: nada aqui é estimativa.</li>
                 </ul>
                 <div class="caixa-aviso">
                     <strong>Limitações conhecidas</strong>
-                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais — por isso alguns “n” variam entre indicadores. Endereço e telefone das escolas não são exibidos (LGPD). As coordenadas vêm da planilha-fonte do Coletivo e servem apenas para a leitura territorial do mapa; quando ausentes ou incompatíveis com o município, a escola é posicionada no centróide do município (posição aproximada). O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
+                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais — por isso alguns “n” variam entre indicadores. <strong>Nem toda escola declara coordenada</strong>, e a cobertura varia bastante entre os territórios; as que não declaram entram no mapa agrupadas por município. Endereço, CEP e telefone existem na base de origem, mas não são republicados aqui. O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola, e há comunidades sem escola alguma — estas, por definição, não aparecem aqui. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
                 </div>
             </div>
             <div class="cartao-fonte">
                 <h3>Baixar e conferir</h3>
-                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-educacionais/censo-escolar" target="_blank" rel="noopener">↗ Censo Escolar — página oficial do INEP</a>
-                <a class="link-fonte" href="__LINK_PLANILHA__" target="_blank" rel="noopener">↗ Planilha de trabalho completa (Google Sheets)</a>
+                <a class="link-fonte" href="__LINK_INEP__" target="_blank" rel="noopener">↗ Microdados do Censo Escolar — INEP</a>
+                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-educacionais/censo-escolar" target="_blank" rel="noopener">↗ Censo Escolar — página oficial</a>
                 <div class="separador"></div>
+                <p style="font-size:13px;margin-bottom:12px;">Os botões abaixo baixam a base inteira carregada nesta página, com os nomes de coluna do INEP. Para a seleção filtrada, use os botões na seção <a href="#tabela" style="color:var(--verde)">Relação das escolas</a>.</p>
                 <div class="lista-download">
                     <button id="btnBaixarTudoCSV">Base completa em CSV (colunas do INEP)</button>
                     <button id="btnBaixarTudoJSON">Base completa em JSON</button>
@@ -476,13 +607,32 @@
             <strong>Dados</strong>
             <p>Microdados do Censo Escolar da Educação Básica (INEP) — recorte de escolas em comunidades quilombolas.</p>
         </div>
-        <div class="assinatura">Painel adaptado do projeto Raizame Dados · Atualização automática semanal a partir da planilha mantida pelo coletivo · Última geração: __DATA_GERACAO__</div>
+        <div class="assinatura">Painel adaptado do projeto Raizame Dados · Gerado a partir dos microdados do Censo Escolar __ANO_CENSO__ (INEP) em __DATA_GERACAO__ · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
     </div>
 </footer>
 
 <script>
-/* ==================== DADOS E DICCIONÁRIOS ==================== */
-const DADOS = __DATA_JSON__;
+/* ==================== DADOS E DICIONÁRIOS ==================== */
+/* Os dados chegam em formato colunar (um array por campo, não um objeto por
+   escola): 3 MB em vez de 25 MB. Aqui remontamos as linhas uma única vez.
+     bin -> string de '1'/'0'/'.'   dic -> {d:[valores], i:[índices]}   num -> array */
+const PACOTE = __DATA_JSON__;
+const DADOS = (() => {
+  const {n, campos, tipos, colunas} = PACOTE;
+  const linhas = new Array(n);
+  for (let i = 0; i < n; i++) linhas[i] = {};
+  for (const campo of campos) {
+    const col = colunas[campo], tipo = tipos[campo];
+    if (tipo === 'bin') {
+      for (let i = 0; i < n; i++) { const c = col[i]; if (c !== '.') linhas[i][campo] = c === '1' ? 1 : 0; }
+    } else if (tipo === 'dic') {
+      for (let i = 0; i < n; i++) { const k = col.i[i]; if (k >= 0) linhas[i][campo] = col.d[k]; }
+    } else {
+      for (let i = 0; i < n; i++) { const v = col[i]; if (v != null) linhas[i][campo] = v; }
+    }
+  }
+  return linhas;
+})();
 const CAMPOS_INEP = __CAMPOS_JSON__;   // campo interno -> nome da coluna do INEP (usado no CSV completo)
 if (typeof L==='undefined' || typeof Chart==='undefined'){
   document.body.insertAdjacentHTML('afterbegin','<div class="caixa-aviso" style="margin:16px"><strong>Não foi possível carregar o painel</strong>As bibliotecas de mapa e gráficos não carregaram (conexão instável ou bloqueio de rede). Recarregue a página.</div>');
@@ -492,6 +642,14 @@ const $ = id => document.getElementById(id);
 const fmt = n => (n == null ? 0 : n).toLocaleString('pt-BR');
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+/* Tipo de território (TP_LOCALIZACAO_DIFERENCIADA). O painel carrega os quatro
+   para permitir a comparação; o filtro abre no recorte quilombola. */
+const TIPOS = {3:'Quilombola',2:'Terra indígena',1:'Assentamento',8:'Outros povos e comunidades tradicionais'};
+const TIPOS_CURTO = {3:'Quilombola',2:'Indígena',1:'Assentamento',8:'Outros trad.'};
+const CORES_TIPO = {3:'#3B5D42',2:'#B9812F',1:'#A85630',8:'#4C1D95'};
+const ORDEM_TIPO = [3,2,1,8];
+const TIPO_PADRAO = '3';
+
 const DEPS = {1:'Federal',2:'Estadual',3:'Municipal',4:'Privada'};
 const CORES_DEP = {1:'#1E40AF',2:'#B9812F',3:'#3B5D42',4:'#A85630'};
 const SITS = {1:'Em atividade',2:'Paralisada',3:'Extinta (no ano do Censo)',4:'Extinta em anos anteriores'};
@@ -500,11 +658,17 @@ const CORES_REGIAO = {'Norte':'#1B4332','Nordeste':'#92400E','Centro-Oeste':'#7C
 const ORDEM_REGIAO = ['Norte','Nordeste','Centro-Oeste','Sudeste','Sul'];
 const PALETA = ['#3B5D42','#B9812F','#A85630','#1E40AF','#7C2D12','#4C1D95','#1B4332','#92400E','#6B7280','#8A7C68'];
 
+/* Etapas ofertadas, medidas pelas turmas que a escola abriu (tabela de Turma do
+   Censo). NÃO use aqui os campos IN_COMUM_* da tabela de Escola: eles dizem em que
+   etapa há alunos com deficiência, TEA ou altas habilidades, não que etapa a escola
+   oferece. Uma versão anterior deste painel cometeu esse erro.
+   `chave` é o campo de contagem; a etapa conta como ofertada quando ele é > 0. */
 const ETAPAS = [
-  ['creche','Creche'],['preEscolar','Pré-escola'],['fundAI','Fund. anos iniciais'],
-  ['fundAF','Fund. anos finais'],['medio','Ensino médio'],['medioIntegrado','Médio integrado'],
-  ['ejaFund','EJA fundamental'],['ejaMedio','EJA médio'],['profissionalizante','Profissionalizante'],
-  ['especialExclusiva','AEE exclusivo']];
+  ['turCreche','Creche'],['turPre','Pré-escola'],['turFundAI','Fund. anos iniciais'],
+  ['turFundAF','Fund. anos finais'],['turMed','Ensino médio'],
+  ['turEjaFund','EJA fundamental'],['turEjaMed','EJA médio'],['turProf','Profissionalizante']];
+const ofertaDe = (r,c) => (r[c]||0) > 0;          // etapa ofertada = tem turma
+const etapasOfertadas = r => ETAPAS.filter(([c])=>ofertaDe(r,c)).map(([,t])=>t);
 
 const ROTULOS_PROF = {profCoordenador:'Coordenação pedagógica',profPedagogo:'Pedagogos',profAdministrativo:'Administrativos',
   profServicos:'Serviços gerais',profAlimentacao:'Alimentação',profSecretario:'Secretários',profGestao:'Gestão',
@@ -526,7 +690,23 @@ const IND = {
   matQuilombola:'Material pedagógico quilombola',matEtnico:'Material étnico-racial',matCampo:'Material do campo',
   matIndigena:'Material indígena',matMultimidia:'Material multimídia',matCientifico:'Material científico',
   conselhoEscolar:'Conselho escolar',gremio:'Grêmio estudantil',assocPais:'Associação de pais e mestres',educAmbiental:'Educação ambiental',
-  temComputador:'Computador',temTV:'TV',temMultimidia:'Projetor multimídia',temLousa:'Lousa digital',equipParabolica:'Antena parabólica'};
+  temComputador:'Computador',temTV:'TV',temMultimidia:'Projetor multimídia',temLousa:'Lousa digital',equipParabolica:'Antena parabólica',
+  ofereceEJA:'Oferece EJA',regular:'Oferece ensino regular',
+  profissionalizante:'Oferece educação profissional',escolarizacao:'Oferece escolarização',
+  multisseriada:'Turma multisseriada no fundamental',
+  matAgricola:'Material pedagógico agrícola',matNenhum:'Não usa material pedagógico específico',
+  internetAdm:'Internet para uso administrativo',internetComunidade:'Internet aberta à comunidade',
+  internetAprendizagem:'Internet em atividades de ensino',educIndigena:'Educação escolar indígena',
+  /* Bloco de educação especial. São alunos com deficiência, TEA ou altas habilidades
+     matriculados em cada etapa — NÃO são as etapas que a escola oferece. */
+  classeEspecial:'Classe especial exclusiva',
+  espCreche:'Aluno com deficiência em classe comum – creche',
+  espPre:'Aluno com deficiência em classe comum – pré-escola',
+  espFundAI:'Aluno com deficiência em classe comum – fund. anos iniciais',
+  espFundAF:'Aluno com deficiência em classe comum – fund. anos finais',
+  espMedio:'Aluno com deficiência em classe comum – ensino médio',
+  espEjaFund:'Aluno com deficiência em classe comum – EJA fundamental',
+  espEjaMedio:'Aluno com deficiência em classe comum – EJA médio'};
 
 const LISTA_INFRA = ['aguaPotavel','energiaRede','esgotoRede','lixoColeta','internet','internetAlunos','bandaLarga',
   'banheiro','banheiroPne','acess','biblioteca','labInfo','labCiencias','quadra','refeitorio','cozinha','alimentacao',
@@ -534,6 +714,7 @@ const LISTA_INFRA = ['aguaPotavel','energiaRede','esgotoRede','lixoColeta','inte
 
 function dimBin(campo, rot){ return {rot, fn:r=>r[campo]===1?'Sim':(r[campo]===0?'Não':'Sem dado'), ordem:['Sim','Não','Sem dado']}; }
 const DIM = {
+  tipo:{rot:'Tipo de território',fn:r=>TIPOS[r.locDif]||'Sem dado',ordem:ORDEM_TIPO.map(t=>TIPOS[t])},
   regiao:{rot:'Região',fn:r=>r.regiao||'—',ordem:ORDEM_REGIAO},
   uf:{rot:'UF',fn:r=>r.uf||'—'},
   municipio:{rot:'Município',fn:r=>r.municipio||'—'},
@@ -544,13 +725,27 @@ const DIM = {
  ['energiaRede','Energia da rede pública'],['esgotoRede','Esgoto da rede pública'],['internetAlunos','Internet para alunos'],
  ['bandaLarga','Banda larga'],['banheiroPne','Banheiro acessível'],['acess','Acessibilidade (algum recurso)'],
  ['matQuilombola','Material pedagógico quilombola'],['alimentacao','Alimentação escolar'],['conselhoEscolar','Conselho escolar'],
- ['educAmbiental','Educação ambiental']].forEach(p => DIM[p[0]] = dimBin(p[0], p[1]));
+ ['educAmbiental','Educação ambiental'],['ofereceEJA','Oferece EJA'],['biblioteca','Biblioteca / sala de leitura'],
+ ['labInfo','Laboratório de informática'],['multisseriada','Turma multisseriada'],
+ ['classeEspecial','Classe especial exclusiva']].forEach(p => DIM[p[0]] = dimBin(p[0], p[1]));
 
 const NUMERICOS = {salas:'Salas de aula utilizadas',salasAcessiveis:'Salas acessíveis',salasClimatizadas:'Salas climatizadas',
-  desktops:'Desktops para alunos',notebooks:'Notebooks para alunos',tablets:'Tablets para alunos',profTotal:'Profissionais não docentes (total)'};
+  desktops:'Desktops para alunos',notebooks:'Notebooks para alunos',tablets:'Tablets para alunos',
+  profTotal:'Profissionais não docentes (total)',
+  turTotal:'Turmas (total)',turEja:'Turmas de EJA',turEjaFund:'Turmas de EJA – fundamental',
+  turEjaMed:'Turmas de EJA – médio',turEjaNoturno:'Turmas de EJA – noturno',turEjaDiurno:'Turmas de EJA – diurno',
+  turFund:'Turmas de ensino fundamental',turFundAI:'Turmas de fund. anos iniciais',
+  turFundAF:'Turmas de fund. anos finais',turMed:'Turmas de ensino médio',
+  turInf:'Turmas de educação infantil',turCreche:'Turmas de creche',turPre:'Turmas de pré-escola',
+  turProf:'Turmas de educação profissional',
+  turFundAFMulti:'Turmas multisseriadas (anos finais)',turFundAIMulti:'Turmas multietapa (infantil + fundamental)'};
+
+/* Variáveis para o gráfico de correlação. Campos binários entram como
+   "% de escolas com…" quando os pontos são municípios ou UF. */
+const LISTA_EJA = ['ofereceEJA','profissionalizante','regular'];
 
 /* ==================== ESTADO ==================== */
-const filtros = {regiao:'',uf:'',dep:'',loc:'',sit:'',etapa:'',busca:''};
+const filtros = {tipo:TIPO_PADRAO,regiao:'',uf:'',dep:'',loc:'',sit:'',etapa:'',busca:''};
 let visiveis = [], ordenacao = {campo:'escola',dir:1}, pagina = 1, porPagina = 20;
 let cruzEmpilhado = true, ultimoCruzamento = null;
 
@@ -565,12 +760,13 @@ function desenha(id, cfg){
 function aplicaFiltros(){
   const b = filtros.busca.trim().toLowerCase();
   visiveis = DADOS.filter(r => {
+    if (filtros.tipo && String(r.locDif) !== filtros.tipo) return false;
     if (filtros.regiao && r.regiao !== filtros.regiao) return false;
     if (filtros.uf && r.uf !== filtros.uf) return false;
     if (filtros.dep && String(r.dep) !== filtros.dep) return false;
     if (filtros.loc && String(r.loc) !== filtros.loc) return false;
     if (filtros.sit && String(r.sit) !== filtros.sit) return false;
-    if (filtros.etapa && r[filtros.etapa] !== 1) return false;
+    if (filtros.etapa && !ofertaDe(r, filtros.etapa)) return false;
     if (b && !((r.escola||'')+' '+(r.municipio||'')+' '+(r.uf||'')).toLowerCase().includes(b)) return false;
     return true;
   });
@@ -623,6 +819,7 @@ function ajustaMapa(){
 }
 function corPonto(r){
   const t = $('camadaTematica').value;
+  if (t==='tipo') return CORES_TIPO[r.locDif] || '#8A7C68';
   if (t==='regiao') return CORES_REGIAO[r.regiao] || '#8A7C68';
   if (t==='dep') return CORES_DEP[r.dep] || '#8A7C68';
   if (t==='loc') return r.loc===1 ? '#B9812F' : (r.loc===2 ? '#3B5D42' : '#8A7C68');
@@ -631,7 +828,8 @@ function corPonto(r){
 }
 function popupEscola(r){
   const linhas = [
-    ['Dependência', DEPS[r.dep]], ['Localização', (LOCS[r.loc]||'')+(r.locDif==3?' · comunidade quilombola':'')],
+    ['Território', TIPOS[r.locDif]], ['Dependência', DEPS[r.dep]], ['Localização', LOCS[r.loc]],
+    ['Turmas de EJA', r.turEja!=null?r.turEja:null], ['Turmas (total)', r.turTotal!=null?r.turTotal:null],
     ['Situação', SITS[r.sit]], ['Salas utilizadas', r.salas!=null?r.salas:null],
     ['Internet', r.internet===1?'Sim':(r.internet===0?'Não':null)],
     ['Água potável', r.aguaPotavel===1?'Sim':(r.aguaPotavel===0?'Não':null)],
@@ -639,39 +837,106 @@ function popupEscola(r){
     ['Esgoto (rede)', r.esgotoRede===1?'Sim':(r.esgotoRede===0?'Não':null)],
     ['Mat. quilombola', r.matQuilombola===1?'Sim':(r.matQuilombola===0?'Não':null)]
   ].filter(l=>l[1]).map(l=>`<tr><td>${l[0]}</td><td><strong>${l[1]}</strong></td></tr>`).join('');
-  const etapas = ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>t).join(', ');
+  const etapas = etapasOfertadas(r).join(', ');
   return `<strong>${esc(r.escola)}</strong><br>${esc(r.municipio)} (${esc(r.uf)})` +
     `<table class="tabela-popup">${linhas}</table>` +
     (etapas?`<div class="popup-etapas"><b>Oferta:</b> ${etapas}</div>`:'') +
     (r.fonteGeo==='municipio'?'<div class="popup-etapas" style="color:#A85630;">Posição aproximada: centróide do município.</div>':'') +
     `<div class="popup-etapas" style="color:#6E624F;">cód. INEP ${esc(r.cod||'—')}</div>`;
 }
+/* O Censo não informa a coordenada da escola, só o município. Desenhar uma bolinha
+   por escola empilharia dezenas delas no mesmo pixel (em Itapecuru Mirim são 41) e
+   faria o mapa parecer mais vazio do que é. Então: escolas COM coordenada própria
+   viram pontos; as que só têm o município viram um círculo por município, com área
+   proporcional ao número de escolas. */
+function popupMunicipio(grupo){
+  const r0 = grupo[0];
+  const porTipo = {};
+  grupo.forEach(r=>{ const t=TIPOS_CURTO[r.locDif]||'—'; porTipo[t]=(porTipo[t]||0)+1; });
+  const linhas = [
+    ['Escolas no recorte', fmt(grupo.length)],
+    ['Com turma de EJA', fmt(grupo.filter(r=>(r.turEja||0)>0).length)],
+    ['Turmas de EJA', fmt(grupo.reduce((t,r)=>t+(r.turEja||0),0))],
+    ['Com internet', `${fmt(grupo.filter(r=>r.internet===1).length)} de ${fmt(grupo.filter(r=>r.internet===0||r.internet===1).length)} com dado`],
+  ].map(l=>`<tr><td>${l[0]}</td><td><strong>${l[1]}</strong></td></tr>`).join('');
+  const tipos = Object.entries(porTipo).map(([t,n])=>`${esc(t)}: ${fmt(n)}`).join(' · ');
+  const nomes = grupo.slice(0,8).map(r=>`<div style="margin-top:3px">• ${esc(r.escola)}</div>`).join('');
+  return `<strong>${esc(r0.municipio)} (${esc(r0.uf)})</strong>` +
+    `<table class="tabela-popup">${linhas}</table>` +
+    `<div class="popup-etapas">${tipos}</div>` +
+    `<div class="popup-etapas" style="max-height:150px;overflow-y:auto">${nomes}` +
+    (grupo.length>8 ? `<div style="margin-top:5px;color:#6E624F">…e mais ${fmt(grupo.length-8)}. A relação completa está na tabela abaixo.</div>` : '') + `</div>` +
+    `<div class="popup-etapas" style="color:#A85630;">Posição aproximada: centróide do município.</div>`;
+}
 function renderPontos(){
   camadaPontos.clearLayers();
+  const proprias = [], porMunicipio = new Map();
   visiveis.forEach(r=>{
     if (r.lat==null || r.lon==null) return;
-    const aprox = r.fonteGeo==='municipio', cor = corPonto(r);   // aproximado = centróide do município
-    const m = L.circleMarker([r.lat,r.lon],{radius:5.5,weight:aprox?1.5:1,color:aprox?cor:'#FBF6EA',fillColor:cor,
-      fillOpacity:aprox?.3:.85,dashArray:aprox?'2 2':null});
+    if (r.fonteGeo==='escola') { proprias.push(r); return; }
+    const k = r.ibge || (r.lat+','+r.lon);
+    if (!porMunicipio.has(k)) porMunicipio.set(k, []);
+    porMunicipio.get(k).push(r);
+  });
+
+  proprias.forEach(r=>{
+    const m = L.circleMarker([r.lat,r.lon],{radius:5.5,weight:1,color:'#FBF6EA',
+      fillColor:corPonto(r),fillOpacity:.85});
     m.bindTooltip(esc(r.escola), {className:'ponto-tooltip'});
     m.bindPopup(()=>popupEscola(r), {maxWidth:320});
     camadaPontos.addLayer(m);
   });
+
+  // Raio pela raiz quadrada da contagem: é assim que a área cresce junto com o
+  // número de escolas, que é como o olho compara símbolos. Raio direto faria o
+  // município de 41 escolas parecer 41 vezes maior. O piso de 4px existe para o
+  // círculo de uma escola só continuar visível e clicável — ele quebra um pouco
+  // a proporcionalidade exata nos menores, em troca de não sumirem do mapa.
+  const maior = Math.max(1, ...[...porMunicipio.values()].map(g=>g.length));
+  const raio = n => 4 + 13 * Math.sqrt(n/maior);
+  porMunicipio.forEach(grupo=>{
+    const r0 = grupo[0];
+    // cor do município: a do tipo/valor dominante entre as escolas dele
+    const cont = {};
+    grupo.forEach(r=>{ const c=corPonto(r); cont[c]=(cont[c]||0)+1; });
+    const cor = Object.entries(cont).sort((a,b)=>b[1]-a[1])[0][0];
+    const m = L.circleMarker([r0.lat,r0.lon],{radius:raio(grupo.length),weight:1.5,
+      color:cor,fillColor:cor,fillOpacity:.45});
+    m.bindTooltip(`${esc(r0.municipio)} (${esc(r0.uf)}) — ${fmt(grupo.length)} escola(s)`, {className:'ponto-tooltip'});
+    m.bindPopup(()=>popupMunicipio(grupo), {maxWidth:340});
+    camadaPontos.addLayer(m);
+  });
+
   atualizaLegendaMapa();
-  atualizaNotaGeo();
+  atualizaNotaGeo(proprias.length, porMunicipio.size);
 }
 function atualizaLegendaMapa(){
   const t = $('camadaTematica').value; let itens;
-  if (t==='regiao') itens = ORDEM_REGIAO.map(g=>[CORES_REGIAO[g],g]).concat([['#8A7C68','Sem dado']]);
+  if (t==='tipo') itens = ORDEM_TIPO.map(k=>[CORES_TIPO[k],TIPOS_CURTO[k]]).concat([['#8A7C68','Sem dado']]);
+  else if (t==='regiao') itens = ORDEM_REGIAO.map(g=>[CORES_REGIAO[g],g]).concat([['#8A7C68','Sem dado']]);
   else if (t==='dep') itens = Object.values(DEPS).map((n,i)=>[Object.values(CORES_DEP)[i],n]).concat([['#8A7C68','Sem dado']]);
   else if (t==='loc') itens = [['#B9812F','Urbana'],['#3B5D42','Rural'],['#8A7C68','Sem dado']];
   else itens = [['#3B5D42','Sim'],['#A85630','Não'],['#8A7C68','Sem dado']];
+  const temGrupo = visiveis.some(r=>r.fonteGeo==='municipio');
+  const temPonto = visiveis.some(r=>r.fonteGeo==='escola');
   $('legendaMapa').innerHTML = itens.map(([c,t2])=>`<span class="item"><span class="bolinha" style="background:${c}"></span>${t2}</span>`).join('') +
-    (visiveis.some(r=>r.fonteGeo==='municipio') ? '<span class="item"><span class="bolinha" style="background:transparent;border:2px dashed #6E624F"></span>Posição aproximada (centróide do município)</span>' : '');
+    (temPonto ? '<span class="item" style="margin-left:6px">' +
+      '<span class="bolinha" style="width:11px;height:11px;background:#6E624F;border:1.5px solid #FBF6EA"></span>' +
+      '&nbsp;Ponto: escola na coordenada que declarou</span>' : '') +
+    (temGrupo ? '<span class="item" style="margin-left:6px">' +
+      '<span class="bolinha" style="width:7px;height:7px;background:#6E624F;opacity:.45"></span>' +
+      '<span class="bolinha" style="width:13px;height:13px;background:#6E624F;opacity:.45;margin-left:2px"></span>' +
+      '<span class="bolinha" style="width:19px;height:19px;background:#6E624F;opacity:.45;margin-left:2px"></span>' +
+      '&nbsp;Círculo: escolas sem coordenada, agrupadas no município</span>' : '');
 }
-function atualizaNotaGeo(){
-  const a = visiveis.filter(r=>r.fonteGeo==='escola').length, b = visiveis.filter(r=>r.fonteGeo==='municipio').length;
-  $('notaGeo').textContent = `No recorte atual, ${fmt(a)} escola(s) estão posicionadas pela própria coordenada geográfica e ${fmt(b)} pelo centróide do município.`;
+function atualizaNotaGeo(proprias, municipios){
+  const agrupadas = visiveis.filter(r=>r.fonteGeo==='municipio').length;
+  const tot = proprias + agrupadas;
+  const partes = [];
+  if (proprias) partes.push(`${fmt(proprias)} escola(s) aparecem na coordenada que declararam` +
+    (tot ? ` (${(100*proprias/tot).toFixed(0)}% do recorte)` : ''));
+  if (agrupadas) partes.push(`${fmt(agrupadas)} sem coordenada estão agrupadas em ${fmt(municipios)} círculo(s) de município`);
+  $('notaGeo').textContent = partes.length ? `No recorte atual, ${partes.join(' e ')}.` : '';
 }
 
 /* ==================== GRÁFICOS DAS SEÇÕES ==================== */
@@ -715,11 +980,20 @@ function renderComparativo(){
       scales:{y:{max:100,ticks:{callback:v=>v+'%'}}}}});
 }
 function renderEtapas(){
-  const dados = ETAPAS.map(([c,rot])=>({rot,n:visiveis.filter(r=>r[c]===1).length})).sort((a,b)=>b.n-a.n);
+  const dados = ETAPAS.map(([c,rot])=>({rot,n:visiveis.filter(r=>ofertaDe(r,c)).length})).sort((a,b)=>b.n-a.n);
   desenha('graficoEtapas',{type:'bar',
     data:{labels:dados.map(d=>d.rot),datasets:[{data:dados.map(d=>d.n),backgroundColor:'#B9812F'}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
       tooltip:{callbacks:{label:c=>` ${fmt(c.parsed.y)} escolas`}}},scales:{y:{beginAtZero:true}}}});
+
+  // a divisão anos iniciais / anos finais é frágil onde há turma multisseriada
+  const comFund = visiveis.filter(r=>r.multisseriada!=null).length;
+  const ms = visiveis.filter(r=>r.multisseriada===1).length;
+  $('notaEtapas').innerHTML = 'A etapa conta como ofertada quando a escola abriu ao menos uma turma dela no ano do Censo — ' +
+    'e não pelo campo de educação especial, que uma versão anterior deste painel usava por engano. ' +
+    (comFund ? `No recorte atual, <strong>${fmt(ms)} de ${fmt(comFund)} escolas com ensino fundamental (${(100*ms/comFund).toFixed(0)}%) têm turma multisseriada</strong>. ` +
+      'Nesses casos o Censo costuma lançar a turma inteira nos anos finais, então uma escola que ensina do 1º ao 9º ano pode aparecer só em “anos finais”. ' +
+      'O painel marca essas escolas em vez de dividir o que o dado não divide.' : '');
 }
 function renderProfs(){
   const pares = Object.entries(ROTULOS_PROF).map(([c,rot])=>({rot,n:visiveis.reduce((t,r)=>t+(r[c]||0),0)}))
@@ -730,15 +1004,305 @@ function renderProfs(){
       tooltip:{callbacks:{label:c=>` ${fmt(c.parsed.x)} profissionais`}}}}});
 }
 
+/* ==================== COMPARAÇÃO ENTRE TIPOS ====================
+   Esta seção compara os tipos de território, então ela ignora o filtro de tipo
+   (senão sobraria uma barra só) e aplica todos os demais filtros. */
+function baseComparacao(){
+  const b = filtros.busca.trim().toLowerCase();
+  return DADOS.filter(r => {
+    if (filtros.regiao && r.regiao !== filtros.regiao) return false;
+    if (filtros.uf && r.uf !== filtros.uf) return false;
+    if (filtros.dep && String(r.dep) !== filtros.dep) return false;
+    if (filtros.loc && String(r.loc) !== filtros.loc) return false;
+    if (filtros.sit && String(r.sit) !== filtros.sit) return false;
+    if (filtros.etapa && !ofertaDe(r, filtros.etapa)) return false;
+    if (b && !((r.escola||'')+' '+(r.municipio||'')+' '+(r.uf||'')).toLowerCase().includes(b)) return false;
+    return true;
+  });
+}
+function renderComparacao(){
+  const campo = $('compIndicador').value, quebraK = $('compQuebra').value;
+  const arr = baseComparacao();
+  const ehNum = campo in NUMERICOS;
+  const quebra = quebraK ? DIM[quebraK] : null;
+  const rotulo = ehNum ? ('Média de ' + NUMERICOS[campo]) : ('% com ' + (IND[campo]||campo));
+
+  let grupos = [''];
+  if (quebra){
+    const cont = {}; arr.forEach(r=>{const v=quebra.fn(r); cont[v]=(cont[v]||0)+1;});
+    grupos = Object.keys(cont);
+    grupos = quebra.ordem ? quebra.ordem.filter(g=>cont[g]).concat(grupos.filter(g=>!quebra.ordem.includes(g)))
+                          : grupos.sort((x,y)=>cont[y]-cont[x]||x.localeCompare(y,'pt-BR'));
+  }
+  const tiposPresentes = ORDEM_TIPO.filter(t => arr.some(r=>r.locDif===t));
+  const cel = {};
+  tiposPresentes.forEach(t=>{ cel[t]={}; grupos.forEach(g=>cel[t][g]={n:0,com:0,soma:0,cont:0}); });
+  arr.forEach(r=>{
+    const g = quebra ? quebra.fn(r) : '';
+    const c = cel[r.locDif] && cel[r.locDif][g];
+    if (!c) return;
+    c.n++;
+    if (ehNum){ if (r[campo]!=null){ c.soma+=r[campo]; c.cont++; } }
+    else if (r[campo]===1){ c.com++; c.cont++; } else if (r[campo]===0){ c.cont++; }
+  });
+  const valorDe = c => !c.cont ? null : (ehNum ? c.soma/c.cont : 100*c.com/c.cont);
+
+  desenha('graficoComparacao',{type:'bar',
+    data:{labels: quebra ? grupos : ['Todas as escolas do recorte'],
+      datasets: tiposPresentes.map(t=>({label:TIPOS_CURTO[t],backgroundColor:CORES_TIPO[t],
+        data: grupos.map(g=>valorDe(cel[t][g]))}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12}},
+        tooltip:{callbacks:{label:ctx=>{
+          const t=tiposPresentes[ctx.datasetIndex], c=cel[t][grupos[ctx.dataIndex]], v=ctx.parsed.y;
+          if (v==null) return ` ${ctx.dataset.label}: sem dado`;
+          return ehNum ? ` ${ctx.dataset.label}: ${v.toLocaleString('pt-BR',{maximumFractionDigits:1})} (${fmt(c.cont)} escolas com dado)`
+                       : ` ${ctx.dataset.label}: ${v.toFixed(1).replace('.',',')}% (${fmt(c.com)} de ${fmt(c.cont)})`;}}}},
+      scales:{y:{beginAtZero:true,max:ehNum?undefined:100,title:{display:true,text:rotulo},
+        ticks:{callback:v=>ehNum?fmt(v):v+'%'}},
+        x:{ticks:{maxRotation:60}}}}});
+
+  const fmtv = v => v==null?'—':(ehNum?v.toLocaleString('pt-BR',{maximumFractionDigits:1}):v.toFixed(1).replace('.',',')+'%');
+  $('cabecalhoComparacao').innerHTML = `<th>Tipo de território</th>` +
+    grupos.map(g=>`<th>${esc(g||rotulo)}</th>`).join('') + `<th>Escolas</th>`;
+  $('corpoComparacao').innerHTML = tiposPresentes.map(t=>{
+    const tot = grupos.reduce((s,g)=>s+cel[t][g].n,0);
+    return `<tr><td><span class="bolinha" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CORES_TIPO[t]};margin-right:7px"></span>${esc(TIPOS[t])}</td>` +
+      grupos.map(g=>`<td>${fmtv(valorDe(cel[t][g]))}</td>`).join('') + `<td class="num">${fmt(tot)}</td></tr>`;
+  }).join('');
+  $('notaComparacao').textContent = (ehNum
+      ? `Média de "${NUMERICOS[campo]}" entre as escolas que informaram o campo.`
+      : `Percentual de escolas com "${IND[campo]||campo}", calculado sobre as que declararam 0 ou 1 no Censo.`)
+    + ` ${fmt(arr.length)} escolas nos quatro tipos, com os demais filtros aplicados.`;
+}
+
+/* ==================== CORRELAÇÃO ====================
+   Campos binários só fazem sentido como dispersão depois de agregados: por
+   município ou UF eles viram "% de escolas com o item". Na unidade "escola" o
+   valor é 0/1 e os pontos se empilham — o aviso na seção diz isso ao leitor. */
+const VARS_CORR = () => {
+  const v = {};
+  Object.entries(NUMERICOS).forEach(([k,r])=>v[k]={rot:r,tipo:'num'});
+  ['aguaPotavel','energiaRede','esgotoRede','internet','internetAlunos','bandaLarga','lixoColeta',
+   'banheiro','banheiroPne','acess','biblioteca','labInfo','labCiencias','quadra','refeitorio','cozinha',
+   'alimentacao','matQuilombola','matEtnico','conselhoEscolar','gremio','assocPais','educAmbiental',
+   'salaAee','temComputador','ofereceEJA','profissionalizante','multisseriada','classeEspecial',
+   'espFundAI','espFundAF','internetComunidade']
+   .forEach(k=>{ if (IND[k]) v[k]={rot:IND[k],tipo:'bin'}; });
+  return v;
+};
+const CORR = VARS_CORR();
+
+function regressao(pts){
+  const n = pts.length;
+  if (n < 3) return null;
+  let sx=0,sy=0,sxy=0,sxx=0,syy=0;
+  for (const p of pts){ sx+=p.x; sy+=p.y; sxy+=p.x*p.y; sxx+=p.x*p.x; syy+=p.y*p.y; }
+  const varX = n*sxx - sx*sx, varY = n*syy - sy*sy;
+  if (varX === 0 || varY === 0) return null;          // uma das variáveis é constante
+  const a = (n*sxy - sx*sy) / varX;                    // inclinação
+  const b = (sy - a*sx) / n;                           // intercepto
+  const r = (n*sxy - sx*sy) / Math.sqrt(varX*varY);
+  return {a, b, r, r2: r*r, n};
+}
+function forcaR(r){
+  const x = Math.abs(r);
+  const f = x<0.1?'praticamente nenhuma':(x<0.3?'fraca':(x<0.5?'moderada':(x<0.7?'considerável':'forte')));
+  return `associação ${f}, ${r<0?'negativa':'positiva'}`;
+}
+function agregaCorr(arr, campoX, campoY, unidade, minimo){
+  const defX = CORR[campoX], defY = CORR[campoY];
+  const pega = (grupo, campo, def) => {
+    if (unidade === 'escola') return grupo[0][campo] ?? null;
+    if (def.tipo === 'bin'){
+      let com=0, cont=0;
+      grupo.forEach(r=>{ if (r[campo]===1){com++;cont++;} else if (r[campo]===0) cont++; });
+      return cont ? 100*com/cont : null;
+    }
+    const vals = grupo.map(r=>r[campo]).filter(v=>v!=null);
+    return vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : null;
+  };
+  const chaveDe = r => unidade==='uf' ? (r.uf||'—')
+                     : unidade==='municipio' ? (r.ibge||'—')
+                     : String(r.cod);
+  const grupos = new Map();
+  arr.forEach(r=>{ const k=chaveDe(r); if(!grupos.has(k)) grupos.set(k,[]); grupos.get(k).push(r); });
+  const corte = unidade==='escola' ? 1 : minimo;   // cada escola é um ponto: o mínimo não se aplica
+  const pts = [];
+  for (const [k, g] of grupos){
+    if (g.length < corte) continue;
+    const x = pega(g, campoX, defX), y = pega(g, campoY, defY);
+    if (x==null || y==null) continue;
+    pts.push({x, y, n:g.length,
+      nome: unidade==='uf' ? k : (unidade==='municipio' ? `${g[0].municipio||'—'} (${g[0].uf||'—'})` : g[0].escola)});
+  }
+  return pts;
+}
+let ultimaCorrelacao = null;
+function renderCorrelacao(){
+  const campoX=$('corrX').value, campoY=$('corrY').value;
+  const unidade=$('corrUnidade').value, serieK=$('corrSeries').value, minimo=+$('corrMinimo').value;
+  const defX=CORR[campoX], defY=CORR[campoY];
+  // Separar por tipo exige os quatro tipos na mão, então essa opção ignora o
+  // filtro de tipo (como a seção de comparação). As demais seguem o recorte.
+  const base = serieK==='tipo' ? baseComparacao() : visiveis;
+  $('corrMinimo').disabled = unidade==='escola';
+  $('corrMinimoNota').textContent = unidade==='escola' ? '(não se aplica)' : '';
+  const rotEixo = (c,d) => d.tipo==='bin' && unidade!=='escola' ? `% com ${d.rot}`
+                    : (d.tipo==='bin' ? `${d.rot} (0 = não, 1 = sim)`
+                    : (unidade==='escola' ? d.rot : `${d.rot} (média)`));
+
+  let series;
+  if (!serieK) series = [{chave:'', rot:'Todas as escolas', cor:PALETA[0], arr:base}];
+  else if (serieK==='tipo') series = ORDEM_TIPO.filter(t=>base.some(r=>r.locDif===t))
+      .map(t=>({chave:t, rot:TIPOS_CURTO[t], cor:CORES_TIPO[t], arr:base.filter(r=>r.locDif===t)}));
+  else {
+    const d = DIM[serieK];
+    const cont={}; base.forEach(r=>{const v=d.fn(r); cont[v]=(cont[v]||0)+1;});
+    let cats=Object.keys(cont);
+    cats = d.ordem ? d.ordem.filter(c=>cont[c]).concat(cats.filter(c=>!d.ordem.includes(c)))
+                   : cats.sort((x,y)=>cont[y]-cont[x]).slice(0,6);
+    series = cats.map((c,i)=>({chave:c, rot:c, cor:PALETA[i%PALETA.length], arr:base.filter(r=>d.fn(r)===c)}));
+  }
+
+  const datasets=[], linhas=[];
+  series.forEach(s=>{
+    const pts = agregaCorr(s.arr, campoX, campoY, unidade, minimo);
+    const reg = regressao(pts);
+    linhas.push({rot:s.rot, cor:s.cor, pts, reg});
+    datasets.push({type:'scatter', label:s.rot, data:pts, backgroundColor:s.cor+'B0',
+      borderColor:s.cor, pointRadius:4, pointHoverRadius:7});
+    if (reg){
+      const xs = pts.map(p=>p.x), x0=Math.min(...xs), x1=Math.max(...xs);
+      datasets.push({type:'line', label:`tendência · ${s.rot}`, borderColor:s.cor, borderWidth:2.5,
+        borderDash:[7,4], pointRadius:0, fill:false, tension:0,
+        data:[{x:x0,y:reg.a*x0+reg.b},{x:x1,y:reg.a*x1+reg.b}]});
+    }
+  });
+
+  const pct = d => d.tipo==='bin' && unidade!=='escola';
+  desenha('graficoCorrelacao',{data:{datasets},
+    options:{responsive:true,maintainAspectRatio:false,parsing:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,filter:i=>!i.text.startsWith('tendência')}},
+        tooltip:{callbacks:{label:ctx=>{
+          if (ctx.dataset.type==='line') return null;
+          const p=ctx.raw;
+          const v = (val,d)=> pct(d) ? val.toFixed(1).replace('.',',')+'%' : val.toLocaleString('pt-BR',{maximumFractionDigits:2});
+          return [` ${p.nome}`, ` ${defX.rot}: ${v(p.x,defX)}`, ` ${defY.rot}: ${v(p.y,defY)}`,
+                  unidade==='escola' ? '' : ` ${fmt(p.n)} escola(s)`].filter(Boolean);}}}},
+      scales:{x:{type:'linear',title:{display:true,text:rotEixo(campoX,defX)},
+                 min:pct(defX)?0:undefined, max:pct(defX)?100:undefined,
+                 ticks:{callback:v=>pct(defX)?v+'%':fmt(v)}},
+              y:{type:'linear',title:{display:true,text:rotEixo(campoY,defY)},
+                 min:pct(defY)?0:undefined, max:pct(defY)?100:undefined,
+                 ticks:{callback:v=>pct(defY)?v+'%':fmt(v)}}}}});
+
+  $('corpoCorrelacao').innerHTML = linhas.map(l=>{
+    if (!l.reg) return `<tr><td>${esc(l.rot)}</td><td class="num">${fmt(l.pts.length)}</td>` +
+      `<td colspan="4" class="celula-vazia">pontos insuficientes para calcular a reta (mínimo 3)</td></tr>`;
+    const {a,b,r,r2} = l.reg;
+    const sinal = b<0 ? '−' : '+';
+    return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${l.cor};margin-right:7px"></span>${esc(l.rot)}</td>` +
+      `<td class="num">${fmt(l.pts.length)}</td><td class="num">${r.toFixed(3).replace('.',',')}</td>` +
+      `<td class="num">${r2.toFixed(3).replace('.',',')}</td>` +
+      `<td>y = ${a.toFixed(3).replace('.',',')}·x ${sinal} ${Math.abs(b).toFixed(2).replace('.',',')}</td>` +
+      `<td>${forcaR(r)}; a reta explica ${(r2*100).toFixed(0)}% da variação</td></tr>`;
+  }).join('');
+  const unidRot = unidade==='uf' ? 'uma UF' : (unidade==='municipio' ? 'um município' : 'uma escola');
+  $('notaCorrelacao').textContent =
+    `Cada ponto é ${unidRot}. ${serieK==='tipo'
+      ? 'Separando por tipo de território, o gráfico usa os quatro tipos e ignora o filtro de tipo do topo da página (os demais filtros continuam valendo).'
+      : `Usa o recorte atual: ${fmt(base.length)} escola(s).`}` +
+    (unidade!=='escola' ? ` Só entram pontos com pelo menos ${minimo} escola(s).` : '');
+  ultimaCorrelacao = {linhas, defX, defY, unidade, campoX, campoY};
+}
+function baixaCorrelacao(){
+  if (!ultimaCorrelacao) return;
+  const {linhas, defX, defY, unidade} = ultimaCorrelacao;
+  const num = v => v==null?'':String(Math.round(v*1e4)/1e4).replace('.',',');
+  const cab = ['Série', unidade==='uf'?'UF':(unidade==='municipio'?'Município':'Escola'),
+               'Escolas no ponto', defX.rot, defY.rot];
+  const out = [];
+  linhas.forEach(l=>l.pts.forEach(p=>out.push([l.rot, p.nome, p.n, num(p.x), num(p.y)])));
+  baixaArquivo('correlacao-escolas.csv',
+    '﻿'+[cab,...out].map(l=>l.map(csvCelula).join(';')).join('\r\n'),'text/csv;charset=utf-8');
+}
+
+/* ==================== EJA ==================== */
+function somaCampo(arr, campo){ return arr.reduce((t,r)=>t+(r[campo]||0),0); }
+function renderEja(){
+  const comEja = visiveis.filter(r=>(r.turEja||0)>0);
+  const declara = pct('ofereceEJA', visiveis);
+  const turmas = somaCampo(visiveis,'turEja'), totTurmas = somaCampo(visiveis,'turTotal');
+  const noturno = somaCampo(visiveis,'turEjaNoturno');
+  const cartoes = [
+    [fmt(comEja.length),'Escolas com turma de EJA', `${pctTxt({p:visiveis.length?100*comEja.length/visiveis.length:null})} do recorte`],
+    [pctTxt(declara),'Declaram oferecer EJA', notaN(declara)],
+    [fmt(turmas),'Turmas de EJA', totTurmas?`${(100*turmas/totTurmas).toFixed(1).replace('.',',')}% de todas as turmas`:''],
+    [fmt(somaCampo(visiveis,'turEjaFund')),'Turmas de EJA – fundamental',''],
+    [fmt(somaCampo(visiveis,'turEjaMed')),'Turmas de EJA – médio',''],
+    [turmas?`${(100*noturno/turmas).toFixed(1).replace('.',',')}%`:'—','Turmas de EJA no noturno',`${fmt(noturno)} turmas`],
+  ];
+  $('indicadoresEja').innerHTML = cartoes.map(c=>
+    `<div class="indicador"><div class="valor">${c[0]}</div><div class="rotulo">${c[1]}</div>${c[2]?`<div class="nota">${c[2]}</div>`:''}</div>`).join('');
+
+  const base = baseComparacao();
+  const tiposPresentes = ORDEM_TIPO.filter(t=>base.some(r=>r.locDif===t));
+  const porTipo = tiposPresentes.map(t=>{
+    const g = base.filter(r=>r.locDif===t);
+    const comT = g.filter(r=>(r.turEja||0)>0).length;
+    return {t, escolas:g.length, com:comT, pctEsc: g.length?100*comT/g.length:0,
+            turmas: somaCampo(g,'turEja'), tot: somaCampo(g,'turTotal')};
+  });
+  desenha('graficoEjaTipo',{type:'bar',
+    data:{labels:porTipo.map(p=>TIPOS_CURTO[p.t]),datasets:[
+      {label:'% das escolas com turma de EJA',backgroundColor:porTipo.map(p=>CORES_TIPO[p.t]),
+       data:porTipo.map(p=>p.pctEsc)},
+      {label:'% das turmas que são de EJA',backgroundColor:porTipo.map(p=>CORES_TIPO[p.t]+'66'),
+       data:porTipo.map(p=>p.tot?100*p.turmas/p.tot:null)}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12}},
+        tooltip:{callbacks:{label:ctx=>{const p=porTipo[ctx.dataIndex];
+          return ctx.datasetIndex===0 ? ` ${ctx.parsed.y.toFixed(1).replace('.',',')}% — ${fmt(p.com)} de ${fmt(p.escolas)} escolas`
+            : ` ${ctx.parsed.y==null?'sem dado':ctx.parsed.y.toFixed(1).replace('.',',')+'%'} — ${fmt(p.turmas)} de ${fmt(p.tot)} turmas`;}}}},
+      scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}}}}});
+
+  const turnos = [['turEjaFundAI','Fund. anos iniciais'],['turEjaFundAF','Fund. anos finais'],
+                  ['turEjaMed','Ensino médio'],['turEjaNoturno','(no noturno)'],
+                  ['turEjaDiurno','(no diurno)'],['turEjaEad','(EAD/semipresencial)'],
+                  ['turEjaIntegral','(tempo integral)']];
+  const vals = turnos.map(([c,rot])=>({rot,n:somaCampo(visiveis,c)}));
+  desenha('graficoEjaTurno',{type:'bar',
+    data:{labels:vals.map(v=>v.rot),datasets:[{data:vals.map(v=>v.n),
+      backgroundColor:vals.map(v=>v.rot.startsWith('(')?'#B9812F':'#3B5D42')}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.parsed.x)} turmas`}}},
+      scales:{x:{beginAtZero:true}}}});
+
+  // As etapas NÃO somam o total: turmas de FIC e de curso técnico integrados à EJA
+  // entram em turEja e não em nenhuma das três barras de etapa. Os turnos, sim, somam.
+  const etapasSoma = somaCampo(visiveis,'turEjaFundAI')+somaCampo(visiveis,'turEjaFundAF')+somaCampo(visiveis,'turEjaMed');
+  const resto = turmas - etapasSoma;
+  $('notaEja').textContent = `No recorte atual, ${fmt(comEja.length)} de ${fmt(visiveis.length)} escola(s) têm ao menos uma turma de EJA, somando ${fmt(turmas)} turma(s). ` +
+    `As três primeiras barras do gráfico ao lado são etapas e somam ${fmt(etapasSoma)}` +
+    (resto > 0 ? ` — as ${fmt(resto)} turmas restantes são de cursos FIC e técnicos integrados à EJA, que o Censo conta no total mas não nessas etapas.` : '.') +
+    ` As barras entre parênteses são recortes de turno e modalidade das mesmas turmas: somam o total, mas não devem ser somadas às etapas.`;
+}
+
 /* ==================== TABELA ==================== */
 function valorOrd(r,c){
+  if (c==='locDif') return TIPOS[r.locDif]||'';
   if (c==='dep') return DEPS[r.dep]||'';
   if (c==='loc') return LOCS[r.loc]||'';
   if (c==='sit') return SITS[r.sit]||'';
   return r[c];
 }
 function marca(v){ return v===1?'<span class="ok">✓</span>':(v===0?'<span class="nok">✗</span>':'<span class="celula-vazia">—</span>'); }
-function etapasDe(r){ return ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>`<span class="chip-etapa">${t}</span>`).join(' '); }
+function etapasDe(r){
+  const chips = etapasOfertadas(r).map(t=>`<span class="chip-etapa">${t}</span>`);
+  if (r.multisseriada===1) chips.push('<span class="chip-etapa" style="border-color:#B9812F;color:#8A6520">multisseriada</span>');
+  return chips.join(' ');
+}
 function renderTabela(){
   const lista = [...visiveis].sort((x,y)=>{
     const a=valorOrd(x,ordenacao.campo), b=valorOrd(y,ordenacao.campo);
@@ -752,11 +1316,12 @@ function renderTabela(){
   const ini=(pagina-1)*porPagina, corte=lista.slice(ini,ini+porPagina);
   $('tabelaCorpo').innerHTML = corte.length ? corte.map(r=>`<tr>
       <td><strong>${esc(r.escola)}</strong><br><span class="celula-vazia">cód. ${esc(r.cod||'—')}</span></td>
+      <td><span class="chip-etapa" style="border-color:${CORES_TIPO[r.locDif]||'#D9CBAC'}">${esc(TIPOS_CURTO[r.locDif]||'—')}</span></td>
       <td>${esc(r.municipio||'—')}</td><td>${esc(r.uf||'—')}</td>
       <td>${DEPS[r.dep]||'—'}</td><td>${LOCS[r.loc]||'—'}</td><td>${SITS[r.sit]||'—'}</td>
       <td>${marca(r.internet)}</td><td>${marca(r.aguaPotavel)}</td><td>${marca(r.energiaRede)}</td><td>${marca(r.esgotoRede)}</td>
-      <td>${r.salas!=null?r.salas:'—'}</td><td>${etapasDe(r)}</td></tr>`).join('')
-    : `<tr><td colspan="12" class="estado-vazio">Nenhuma escola no recorte atual.</td></tr>`;
+      <td>${r.salas!=null?r.salas:'—'}</td><td>${r.turEja!=null?r.turEja:'—'}</td><td>${etapasDe(r)}</td></tr>`).join('')
+    : `<tr><td colspan="14" class="estado-vazio">Nenhuma escola no recorte atual.</td></tr>`;
   const de = total===0?0:ini+1, ate = Math.min(total, ini+porPagina);
   $('paginacao').innerHTML = `<span>Mostrando ${fmt(de)}–${fmt(ate)} de ${fmt(total)} escolas</span>
     <span class="controles">
@@ -863,13 +1428,15 @@ function baixaArquivo(nome, conteudo, tipo){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 function exportaCSV(dados,nome){
-  const cab=['Escola','Código INEP','Município','UF','Região','Dependência','Localização','Situação',
-            'Internet','Água potável','Energia (rede)','Esgoto (rede)','Salas utilizadas','Etapas ofertadas',
-            'Latitude','Longitude','Origem da coordenada'];
+  const cab=['Escola','Código INEP','Tipo de território','Município','UF','Região','Dependência','Localização','Situação',
+            'Internet','Água potável','Energia (rede)','Esgoto (rede)','Salas utilizadas',
+            'Turmas (total)','Turmas de EJA','Turmas de EJA – fundamental','Turmas de EJA – médio','Turmas de EJA – noturno',
+            'Etapas ofertadas','Turma multisseriada','Latitude','Longitude','Origem da coordenada'];
   const coord = v => v==null ? '' : String(v).replace('.',',');
-  const linhas=dados.map(r=>[r.escola,r.cod,r.municipio,r.uf,r.regiao,DEPS[r.dep],LOCS[r.loc],SITS[r.sit],
+  const linhas=dados.map(r=>[r.escola,r.cod,TIPOS[r.locDif],r.municipio,r.uf,r.regiao,DEPS[r.dep],LOCS[r.loc],SITS[r.sit],
     sntxt(r.internet),sntxt(r.aguaPotavel),sntxt(r.energiaRede),sntxt(r.esgotoRede),r.salas??'',
-    ETAPAS.filter(([c])=>r[c]===1).map(([,t])=>t).join('; '),
+    r.turTotal??'',r.turEja??'',r.turEjaFund??'',r.turEjaMed??'',r.turEjaNoturno??'',
+    etapasOfertadas(r).join('; '), r.multisseriada==null?'':(r.multisseriada===1?'Sim':'Não'),
     coord(r.lat),coord(r.lon),r.fonteGeo==='escola'?'coordenada da escola':(r.fonteGeo==='municipio'?'centróide do município':'')]);
   baixaArquivo(nome,'\ufeff'+[cab,...linhas].map(l=>l.map(csvCelula).join(';')).join('\r\n'),'text/csv;charset=utf-8');
 }
@@ -884,11 +1451,16 @@ function exportaCSVCompleto(dados,nome){
 function atualiza(){
   aplicaFiltros();
   $('faixaRecorte').textContent = `Recorte atual: ${fmt(visiveis.length)} escola(s) · ${fmt(contaMunicipios())} município(s) · ${contaUF()} UF`;
-  renderIndicadores(); renderPontos(); renderInfra(); renderDonuts(); renderComparativo();
+  renderIndicadores(); renderPontos(); renderInfra(); renderComparacao(); renderEja();
+  renderCorrelacao(); renderDonuts(); renderComparativo();
   renderEtapas(); renderProfs(); renderTabela(); renderCruzador();
 }
 function addOptions(sel,itens){ itens.forEach(([v,t])=>sel.add(new Option(t,v))); }
 function populaFiltros(){
+  const tiposNaBase = ORDEM_TIPO.filter(t=>DADOS.some(r=>r.locDif===t));
+  addOptions($('filterTipo'), tiposNaBase.map(t=>[String(t),TIPOS[t]]).concat([['','Todos os tipos (comparar)']]));
+  $('filterTipo').value = tiposNaBase.includes(+TIPO_PADRAO) ? TIPO_PADRAO : '';
+  filtros.tipo = $('filterTipo').value;
   addOptions($('filterRegiao'), ORDEM_REGIAO.filter(x=>DADOS.some(r=>r.regiao===x)).map(v=>[v,v]));
   addOptions($('filterUF'), [...new Set(DADOS.map(r=>r.uf).filter(Boolean))].sort().map(v=>[v,v]));
   addOptions($('filterDep'), Object.entries(DEPS).map(([k,v])=>[k,v]));
@@ -899,17 +1471,30 @@ function populaFiltros(){
   addOptions($('cruzB'), [['','(nenhuma)']].concat(Object.entries(DIM).map(([k,d])=>[k,d.rot])));
   addOptions($('cruzInd'), Object.entries(IND).map(([k,v])=>[k,v]));
   addOptions($('cruzNum'), Object.entries(NUMERICOS).map(([k,v])=>[k,v]));
+
+  // comparação: indicadores binários primeiro, numéricos depois
+  addOptions($('compIndicador'), Object.entries(IND).map(([k,v])=>[k,v])
+    .concat(Object.entries(NUMERICOS).map(([k,v])=>[k,'Média · '+v])));
+  $('compIndicador').value = 'internet';
+
+  const opcoesCorr = Object.entries(CORR).map(([k,d])=>[k, d.tipo==='bin' ? '% · '+d.rot : 'nº · '+d.rot]);
+  addOptions($('corrX'), opcoesCorr); addOptions($('corrY'), opcoesCorr);
+  // Exemplo de abertura: escolas maiores abrem mais turmas de EJA (r ≈ 0,5 no
+  // recorte quilombola). Mostra uma reta de verdade, sem ser tautológico.
+  $('corrX').value = 'salas'; $('corrY').value = 'turEja';
 }
 function ligaEventos(){
-  ['filterRegiao','filterUF','filterDep','filterLoc','filterSit','filterEtapa'].forEach(id=>{
+  ['filterTipo','filterRegiao','filterUF','filterDep','filterLoc','filterSit','filterEtapa'].forEach(id=>{
     $(id).addEventListener('change',e=>{filtros[id.replace('filter','').toLowerCase()]=e.target.value; pagina=1; atualiza();
-      if (id==='filterRegiao' || id==='filterUF') ajustaMapa();});
+      if (id==='filterTipo' || id==='filterRegiao' || id==='filterUF') ajustaMapa();});
   });
   let tb=null;
   $('filterBusca').addEventListener('input',e=>{clearTimeout(tb); tb=setTimeout(()=>{filtros.busca=e.target.value; pagina=1; atualiza();},250);});
-  $('btnLimpar').addEventListener('click',()=>{
+  $('btnLimpar').addEventListener('click',()=>{          // volta ao recorte quilombola, não a "todos"
     Object.keys(filtros).forEach(k=>filtros[k]='');
     ['filterRegiao','filterUF','filterDep','filterLoc','filterSit','filterEtapa'].forEach(id=>$(id).value='');
+    $('filterTipo').value = [...$('filterTipo').options].some(o=>o.value===TIPO_PADRAO) ? TIPO_PADRAO : '';
+    filtros.tipo = $('filterTipo').value;
     $('filterBusca').value=''; pagina=1; atualiza(); ajustaMapa();});
   $('camadaTematica').addEventListener('change',renderPontos);
   $('btnAjustarMapa').addEventListener('click',ajustaMapa);
@@ -934,6 +1519,9 @@ function ligaEventos(){
   $('btnEmpilha').addEventListener('click',()=>{cruzEmpilhado=!cruzEmpilhado;
     $('btnEmpilha').textContent=cruzEmpilhado?'Ver agrupado':'Ver empilhado'; renderCruzador();});
   $('btnBaixarCruzamento').addEventListener('click',baixaCruzamento);
+  ['compIndicador','compQuebra'].forEach(id=>$(id).addEventListener('change',renderComparacao));
+  ['corrX','corrY','corrUnidade','corrSeries','corrMinimo'].forEach(id=>$(id).addEventListener('change',renderCorrelacao));
+  $('btnBaixarCorrelacao').addEventListener('click',baixaCorrelacao);
 }
 
 Chart.defaults.font.family = "'Inter',sans-serif";

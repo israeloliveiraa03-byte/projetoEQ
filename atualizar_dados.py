@@ -4,27 +4,48 @@
 atualizar_dados.py — Escolas Quilombolas em Dados (CONAQ · Coletivo de Educação)
 ================================================================================
 
-Baixa a planilha pública do Google Sheets com o recorte quilombola do Censo
-Escolar (tabela "Escola", escolas em comunidades quilombolas), limpa os dados,
-recupera as coordenadas geográficas e regenera o index.html do painel a partir
-de template.html — mesma arquitetura do painel Raizame Dados.
+Gera o painel (index.html) a partir dos microdados do Censo Escolar baixados do
+INEP. É um script de uso manual: você baixa os CSVs, roda o script, publica o
+index.html que sai. Não há automação nem planilha intermediária.
 
-Uso local (requer só Python 3.9+ e internet, nada para instalar):
-    python3 atualizar_dados.py                 # baixa a planilha configurada
-    python3 atualizar_dados.py --csv escolas.csv   # usa um CSV local (teste ou planilha privada)
-    python3 atualizar_dados.py --forcar        # ignora a trava de queda brusca no total de escolas
+    https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-escolar
 
-Arquivos esperados no mesmo diretório:
-    template.html   -> painel com os placeholders __DATA_JSON__ etc.
+Uso (requer só Python 3.9+, nada para instalar):
 
-Gera:
-    index.html      -> painel pronto para publicar.
+    python3 atualizar_dados.py --escola Tabela_Escola_2025.csv \\
+                               --turma  Tabela_Turma_2025.csv
+
+    --turma é opcional; sem ela, o painel sai sem a seção de EJA.
+    --coordenadas é opcional; veja "SOBRE A LOCALIZAÇÃO DAS ESCOLAS" abaixo.
+
+Outras opções:
+    --saida painel.html     grava com outro nome
+    --so-quilombolas        carrega apenas o código 3 (painel menor, sem comparação)
+
+--------------------------------------------------------------------------------
+SOBRE A LOCALIZAÇÃO DAS ESCOLAS
+--------------------------------------------------------------------------------
+Os microdados públicos do Censo Escolar NÃO trazem latitude e longitude — nem na
+tabela de Escola, nem na de Turma. O dado mais fino de localização é o município
+(e o distrito, que não tem centróide público fácil de obter).
+
+Por isso, por padrão, o painel não desenha uma escola por ponto: desenha um
+círculo por município, com o tamanho proporcional ao número de escolas. Isso é
+honesto — é a granularidade que os dados têm. Empilhar 41 escolas de Itapecuru
+Mirim no mesmo pixel faria o mapa parecer mais esparso do que a realidade.
+
+Se você conseguir as coordenadas por escola (o Catálogo de Escolas do INEP,
+em https://censobasico.inep.gov.br/censobasico/#/ , permite exportar CSV com
+latitude e longitude), passe o arquivo em --coordenadas. Ele precisa ter uma
+coluna com o código INEP da escola e colunas de latitude e longitude, em
+qualquer ordem e com nomes reconhecíveis. Aí o painel desenha escola por escola,
+e usa o centróide do município só para as que ficarem sem coordenada.
 """
 
 import argparse
 import csv
 import difflib
-import hashlib
+import gzip
 import io
 import json
 import os
@@ -35,40 +56,48 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 
-# ----------------------------------------------------------------------
-# CONFIGURAÇÃO — preencha quando criar a planilha online (ver README.md)
-# ----------------------------------------------------------------------
-SHEET_ID = os.environ.get("SHEET_ID") or "COLE_AQUI_O_ID_DA_PLANILHA"   # docs.google.com/spreadsheets/d/<ESTE_ID>/edit
-GID = os.environ.get("GID") or "0"                                       # número da aba com os dados (ver README)
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
-LINK_PLANILHA = os.environ.get("LINK_PLANILHA") or ""                    # link público da planilha (seção Fontes)
+csv.field_size_limit(10 ** 9)
 
+# ----------------------------------------------------------------------
+# CONFIGURAÇÃO
+# ----------------------------------------------------------------------
 MUNICIPIOS_URL = "https://raw.githubusercontent.com/kelvins/municipios-brasileiros/main/csv/municipios.csv"
+MUNICIPIOS_CACHE = "municipios-ibge.csv"     # baixado uma vez e reaproveitado (permite rodar offline)
 
 TEMPLATE_PATH = "template.html"
-OUTPUT_PATH = "index.html"
+SAIDA_PADRAO = "index.html"
 
-SO_QUILOMBOLAS = True      # mantém apenas os códigos abaixo em TP_LOCALIZACAO_DIFERENCIADA
-CODIGOS_QUILOMBOLAS = {3}  # 3 = área remanescente de quilombo. Confira no dicionário do INEP do ano se outros
-                           # códigos também identificam quilombos; se sim, inclua-os aqui e ajuste o texto de
-                           # metodologia do template.
-MINIMO_REGISTROS = int(os.environ.get("MINIMO_REGISTROS", "200"))   # trava de segurança contra download quebrado
-QUEDA_MAXIMA = 0.30        # aborta se a base encolher mais que isso em relação ao painel publicado
-TOLERANCIA_GRAUS = 3.0     # coordenada a mais que isso do centróide do município é tratada como suspeita
+LINK_INEP = "https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-escolar"
+
+# Universo carregado no painel. 3 = quilombola; os outros entram para permitir a
+# comparação entre tipos de território (--so-quilombolas deixa só o 3).
+UNIVERSO = {1, 2, 3, 8}
+
+MINIMO_REGISTROS = 200     # trava contra CSV truncado ou tabela errada
+
+# Validação de coordenadas. Uma coordenada bem formada é aceita se cair dentro do
+# envelope da própria UF (ver caixas_por_uf). O centróide do município entra só para
+# desempatar número corrompido — ele não serve como teste de distância, porque há
+# municípios amazônicos maiores que países e porque a própria lista de centróides
+# tem erros (Pau d'Arco/PA aparece a 750 km do lugar certo).
+MARGEM_UF = 2.0            # graus além dos centróides das bordas da UF
+TOLERANCIA_GRAUS = 3.0     # só para escolher entre candidatos de um número corrompido
 
 # ----------------------------------------------------------------------
 # MAPEAMENTO: coluna do Censo -> campo interno do painel
-# Se o INEP/planilha renomear uma coluna, o script avisa no log em vez de
-# quebrar; basta ajustar o nome aqui.
+# Se o INEP renomear uma coluna, o script avisa no log (e sugere a parecida)
+# em vez de quebrar; basta ajustar o nome aqui.
 # ----------------------------------------------------------------------
-CAMPOS = {
+CAMPOS_ESCOLA = {
     # ----- identificação e localização -----
     'NU_ANO_CENSO': 'ano', 'NO_REGIAO': 'regiao', 'NO_UF': 'ufNome', 'SG_UF': 'uf',
     'NO_MUNICIPIO': 'municipio', 'CO_MUNICIPIO': 'ibge',
     'NO_ENTIDADE': 'escola', 'CO_ENTIDADE': 'cod',
     'TP_DEPENDENCIA': 'dep', 'TP_LOCALIZACAO': 'loc',
     'TP_LOCALIZACAO_DIFERENCIADA': 'locDif', 'TP_SITUACAO_FUNCIONAMENTO': 'sit',
-    'DS_ENDERECO': 'endereco', 'NO_BAIRRO': 'bairro',
+    # Coordenadas: existem na versão completa da tabela de Escola (colunas AH e AI) e
+    # não existem na versão anonimizada (_V2). Quando faltam, o painel agrupa as
+    # escolas por município — veja "SOBRE A LOCALIZAÇÃO DAS ESCOLAS" no topo.
     'LATITUDE': 'latTxt', 'LONGITUDE': 'lonTxt',
     # ----- água / energia / esgoto / lixo -----
     'IN_AGUA_POTAVEL': 'aguaPotavel', 'IN_AGUA_REDE_PUBLICA': 'aguaRede',
@@ -84,12 +113,12 @@ CAMPOS = {
     'IN_BANHEIRO_CHUVEIRO': 'banheiroChuveiro', 'IN_BIBLIOTECA_SALA_LEITURA': 'biblioteca',
     'IN_COZINHA': 'cozinha', 'IN_DESPENSA': 'despensa', 'IN_REFEITORIO': 'refeitorio',
     'IN_LABORATORIO_CIENCIAS': 'labCiencias', 'IN_LABORATORIO_INFORMATICA': 'labInfo',
-    'IN_PATIO_COBERTO': 'patioCoberto', 'IN_PATIO_DESCOBERTO': 'patioDescoberto',
-    'IN_PARQUE_INFANTIL': 'parqueInfantil', 'IN_QUADRA_ESPORTES': 'quadra',
-    'IN_SALA_DIRETORIA': 'salaDiretoria', 'IN_SALA_LEITURA': 'salaLeitura',
-    'IN_SALA_PROFESSOR': 'salaProfessor', 'IN_SECRETARIA': 'secretaria',
-    'IN_SALA_ATENDIMENTO_ESPECIAL': 'salaAee', 'IN_AREA_VERDE': 'areaVerde',
-    'IN_AREA_PLANTIO': 'areaPlantio', 'IN_DORMITORIO_ALUNO': 'dormitorioAluno',
+    'IN_PATIO_COBERTO': 'patioCoberto', 'IN_PARQUE_INFANTIL': 'parqueInfantil',
+    'IN_QUADRA_ESPORTES': 'quadra', 'IN_SALA_DIRETORIA': 'salaDiretoria',
+    'IN_SALA_LEITURA': 'salaLeitura', 'IN_SALA_PROFESSOR': 'salaProfessor',
+    'IN_SECRETARIA': 'secretaria', 'IN_SALA_ATENDIMENTO_ESPECIAL': 'salaAee',
+    'IN_AREA_VERDE': 'areaVerde', 'IN_ALMOXARIFADO': 'almoxarifado',
+    'IN_DORMITORIO_ALUNO': 'dormitorioAluno',
     # ----- acessibilidade -----
     'IN_ACESSIBILIDADE_CORRIMAO': 'accCorrimao', 'IN_ACESSIBILIDADE_ELEVADOR': 'accElevador',
     'IN_ACESSIBILIDADE_PISOS_TATEIS': 'accPisosTateis', 'IN_ACESSIBILIDADE_VAO_LIVRE': 'accVaoLivre',
@@ -105,7 +134,8 @@ CAMPOS = {
     'QT_DESKTOP_ALUNO': 'desktops', 'QT_COMP_PORTATIL_ALUNO': 'notebooks', 'QT_TABLET_ALUNO': 'tablets',
     # ----- internet -----
     'IN_INTERNET': 'internet', 'IN_INTERNET_ALUNOS': 'internetAlunos',
-    'IN_INTERNET_COMUNIDADE': 'internetComunidade', 'IN_BANDA_LARGA': 'bandaLarga',
+    'IN_INTERNET_ADMINISTRATIVO': 'internetAdm', 'IN_BANDA_LARGA': 'bandaLarga',
+    'IN_INTERNET_COMUNIDADE': 'internetComunidade', 'IN_INTERNET_APRENDIZAGEM': 'internetAprendizagem',
     # ----- profissionais -----
     'QT_PROF_ADMINISTRATIVOS': 'profAdministrativo', 'QT_PROF_SERVICOS_GERAIS': 'profServicos',
     'QT_PROF_BIBLIOTECARIO': 'profBibliotecario', 'QT_PROF_SAUDE': 'profSaude',
@@ -120,16 +150,41 @@ CAMPOS = {
     'IN_ALIMENTACAO': 'alimentacao', 'IN_MATERIAL_PED_QUILOMBOLA': 'matQuilombola',
     'IN_MATERIAL_PED_ETNICO': 'matEtnico', 'IN_MATERIAL_PED_CAMPO': 'matCampo',
     'IN_MATERIAL_PED_INDIGENA': 'matIndigena', 'IN_MATERIAL_PED_MULTIMIDIA': 'matMultimidia',
-    'IN_MATERIAL_PED_CIENTIFICO': 'matCientifico',
+    'IN_MATERIAL_PED_CIENTIFICO': 'matCientifico', 'IN_MATERIAL_PED_AGRICOLA': 'matAgricola',
+    'IN_MATERIAL_PED_NENHUM': 'matNenhum',
+    # ----- formação e língua -----
+    'IN_EDUCACAO_INDIGENA': 'educIndigena', 'IN_EXAME_SELECAO': 'exameSelecao',
     # ----- participação e gestão -----
     'IN_ORGAO_CONSELHO_ESCOLAR': 'conselhoEscolar', 'IN_ORGAO_ASS_PAIS_MESTRES': 'assocPais',
     'IN_ORGAO_GREMIO_ESTUDANTIL': 'gremio', 'IN_EDUC_AMBIENTAL': 'educAmbiental',
-    # ----- oferta / etapas -----
-    'IN_ESPECIAL_EXCLUSIVA': 'especialExclusiva', 'IN_PROFISSIONALIZANTE': 'profissionalizante',
-    'IN_COMUM_CRECHE': 'creche', 'IN_COMUM_PRE': 'preEscolar',
-    'IN_COMUM_FUND_AI': 'fundAI', 'IN_COMUM_FUND_AF': 'fundAF',
-    'IN_COMUM_MEDIO_MEDIO': 'medio', 'IN_COMUM_MEDIO_INTEGRADO': 'medioIntegrado',
-    'IN_COMUM_EJA_FUND': 'ejaFund', 'IN_COMUM_EJA_MEDIO': 'ejaMedio',
+    # ----- modalidades ofertadas (estas SIM dizem o que a escola oferece) -----
+    'IN_ESCOLARIZACAO': 'escolarizacao', 'IN_REGULAR': 'regular', 'IN_EJA': 'ofereceEJA',
+    'IN_PROFISSIONALIZANTE': 'profissionalizante',
+    # ----- educação especial -----
+    # ATENÇÃO: os campos IN_COMUM_* e IN_ESP_EXCLUSIVA_* NÃO dizem quais etapas a escola
+    # oferece. Eles dizem em que etapa há alunos com deficiência, TEA ou altas habilidades
+    # — em classes comuns (COMUM) ou em classe especial exclusiva (ESP_EXCLUSIVA). Uma
+    # versão anterior deste painel os usava como "etapas ofertadas", o que estava errado:
+    # a etapa ofertada vem da tabela de Turma, abaixo.
+    'IN_ESPECIAL_EXCLUSIVA': 'classeEspecial',
+    'IN_COMUM_CRECHE': 'espCreche', 'IN_COMUM_PRE': 'espPre',
+    'IN_COMUM_FUND_AI': 'espFundAI', 'IN_COMUM_FUND_AF': 'espFundAF',
+    'IN_COMUM_MEDIO_MEDIO': 'espMedio',
+    'IN_COMUM_EJA_FUND': 'espEjaFund', 'IN_COMUM_EJA_MEDIO': 'espEjaMedio',
+}
+
+# Tabela de Turma: quantas turmas a escola efetivamente abriu. É o que mostra o
+# tamanho real da oferta — IN_EJA na tabela de Escola só diz sim/não.
+CAMPOS_TURMA = {
+    'QT_TUR_BAS': 'turTotal',
+    'QT_TUR_INF': 'turInf', 'QT_TUR_INF_CRE': 'turCreche', 'QT_TUR_INF_PRE': 'turPre',
+    'QT_TUR_FUND': 'turFund', 'QT_TUR_FUND_AI': 'turFundAI', 'QT_TUR_FUND_AF': 'turFundAF',
+    'QT_TUR_FUND_AI_MULTIETAPA': 'turFundAIMulti', 'QT_TUR_FUND_AF_MULTI': 'turFundAFMulti',
+    'QT_TUR_MED': 'turMed', 'QT_TUR_PROF': 'turProf',
+    'QT_TUR_EJA': 'turEja', 'QT_TUR_EJA_FUND': 'turEjaFund', 'QT_TUR_EJA_MED': 'turEjaMed',
+    'QT_TUR_EJA_FUND_AI': 'turEjaFundAI', 'QT_TUR_EJA_FUND_AF': 'turEjaFundAF',
+    'QT_TUR_EJA_D': 'turEjaDiurno', 'QT_TUR_EJA_N': 'turEjaNoturno', 'QT_TUR_EJA_EAD': 'turEjaEad',
+    'QT_TUR_EJA_INT': 'turEjaIntegral',
 }
 
 TEXTO = {'ano', 'regiao', 'ufNome', 'uf', 'municipio', 'ibge', 'escola', 'cod', 'latTxt', 'lonTxt'}
@@ -139,44 +194,64 @@ PROFS = ['profAdministrativo', 'profServicos', 'profBibliotecario', 'profSaude',
          'profAlimentacao', 'profPedagogo', 'profSecretario', 'profSeguranca',
          'profMonitor', 'profGestao', 'profAssistenteSocial', 'profLibras',
          'profAgricola', 'profBraille']
-INTEIROS = {'salas', 'salasClimatizadas', 'salasAcessiveis', 'desktops',
-            'notebooks', 'tablets', 'dep', 'loc', 'locDif', 'sit'} | set(PROFS)
+
+INTEIROS = ({'salas', 'salasClimatizadas', 'salasAcessiveis', 'desktops', 'notebooks',
+             'tablets', 'dep', 'loc', 'locDif', 'sit'} | set(PROFS) | set(CAMPOS_TURMA.values()))
 
 ACC_BRUTOS = ('accCorrimao', 'accElevador', 'accPisosTateis', 'accVaoLivre',
               'accRampas', 'accSinalTatil', 'accSinalVisual', 'accSinalizacao',
               'accInexistente')
 
+# Campos de trabalho, que não vão para o JSON público.
+# latTxt/lonTxt saem porque o que interessa é o lat/lon já tratado.
+OCULTOS = ('ufNome', 'latTxt', 'lonTxt') + ACC_BRUTOS
+
+# A versão completa da tabela de Escola traz endereço, CEP e telefone das escolas.
+# O painel é uma página pública, e este projeto optou por não republicar esses
+# campos; por isso eles nem chegam a ser lidos. Para incluí-los (por exemplo, num
+# painel interno do coletivo), acrescente-os a CAMPOS_ESCOLA.
+NAO_LIDOS = ('DS_ENDERECO', 'NU_ENDERECO', 'DS_COMPLEMENTO', 'NO_BAIRRO',
+             'CO_CEP', 'NU_DDD', 'NU_TELEFONE')
+
+# Colunas que podem faltar sem que isso seja um problema: a versão anonimizada
+# dos microdados (_V2) não traz coordenadas.
+OPCIONAIS = {'LATITUDE', 'LONGITUDE'}
+
 
 # ----------------------------------------------------------------------
-# UTILITÁRIOS
+# LEITURA DE ARQUIVOS
 # ----------------------------------------------------------------------
-def baixar_texto(url):
-    if not re.match(r'^[a-z][a-z0-9+.-]*://', url):      # caminho de arquivo local (--csv)
-        with open(url, encoding='utf-8-sig', newline='') as f:
-            return f.read()
-    req = urllib.request.Request(url, headers={"User-Agent": "escolas-quilombolas-bot/1.0"})
-    for tentativa in range(1, 4):
+def decodifica(b):
+    """Os microdados do INEP vêm em latin-1; exportações de planilha, em UTF-8."""
+    for enc in ('utf-8-sig', 'latin-1'):
         try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                return resp.read().decode("utf-8-sig")
-        except urllib.error.HTTPError as e:
-            if e.code < 500:      # 403/404: repetir não adianta (planilha privada, ID ou GID errados)
-                raise RuntimeError(f"HTTP {e.code} ao baixar {url.split('?')[0]}. Confira o SHEET_ID/GID e se a planilha "
-                                   "está compartilhada como 'Qualquer pessoa com o link'.") from e
-            if tentativa == 3:
-                raise
-            print(f"  falha no download ({e}); nova tentativa {tentativa + 1}/3…")
-            time.sleep(5 * tentativa)
-        except Exception as e:
-            if tentativa == 3:
-                raise
-            print(f"  falha no download ({e}); nova tentativa {tentativa + 1}/3…")
-            time.sleep(5 * tentativa)
+            return b.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return b.decode('latin-1', errors='replace')
 
 
-def para_bin(v):
-    n = para_int(v)
-    return n if n in (0, 1) else None
+def le_arquivo(caminho):
+    if not os.path.exists(caminho):
+        raise RuntimeError(f"arquivo não encontrado: {caminho}")
+    with open(caminho, 'rb') as f:
+        return decodifica(f.read())
+
+
+def separador(primeira_linha):
+    return ';' if primeira_linha.count(';') >= primeira_linha.count(',') else ','
+
+
+def abre_csv(caminho, rotulo):
+    """Devolve (leitor, cabeçalho) já com separador e codificação resolvidos."""
+    print(f"Lendo {rotulo}: {caminho}")
+    texto = le_arquivo(caminho)
+    if not texto.strip():
+        raise RuntimeError(f"a {rotulo} está vazia.")
+    primeira = texto[:texto.index('\n')] if '\n' in texto else texto
+    leitor = csv.reader(io.StringIO(texto), delimiter=separador(primeira))
+    cabecalho = [h.replace('\xa0', ' ').strip() for h in next(leitor)]
+    return leitor, cabecalho
 
 
 def para_int(v):
@@ -194,43 +269,151 @@ def para_int(v):
     return n
 
 
-# ----------------------------------------------------------------------
-# GEOCODIFICAÇÃO
-# ----------------------------------------------------------------------
-def recupera_coord(txt, ref, e_lat):
-    """
-    Recupera a coordenada a partir do texto da planilha.
+def para_bin(v):
+    n = para_int(v)
+    return n if n in (0, 1) else None
 
-    O Censo traz latitude/longitude como '-2.491758333'. Quando esses valores
-    são colados numa planilha em português, o ponto é interpretado como
-    separador de milhar e o número vira o inteiro -2491758333 (exibido como
-    '-2,491,758,333'). Aqui recolocamos a vírgula decimal: testamos 1 ou 2
-    dígitos na parte inteira e escolhemos o candidato que cai na faixa
-    geográfica correta e mais perto do centróide do município (referência).
+
+def so_digitos(v):
+    """'1505008.0' ou '1.505.008' -> '1505008'."""
+    return re.sub(r'\D', '', re.sub(r'\.0+$', '', (v or '').strip()))
+
+
+# ----------------------------------------------------------------------
+# CENTRÓIDES MUNICIPAIS
+# ----------------------------------------------------------------------
+def caixas_por_uf(por_codigo):
     """
-    if not txt:
-        return None
+    Envelope geográfico de cada UF, a partir dos centróides dos seus municípios
+    (o código da UF são os dois primeiros dígitos do código do município).
+
+    Serve para validar uma coordenada bem formada sem depender do centróide de UM
+    município, que pode estar errado na lista de referência ou ficar muito longe
+    da escola em municípios enormes. Altamira (PA) tem 159 mil km²: uma escola
+    legítima pode estar a 600 km do centróide. Já uma escola da Bahia com
+    coordenada em Roraima continua sendo pega.
+    """
+    caixas = {}
+    for cod, (lat, lon) in por_codigo.items():
+        uf = cod[:2]
+        c = caixas.setdefault(uf, [lat, lat, lon, lon])
+        c[0] = min(c[0], lat); c[1] = max(c[1], lat)
+        c[2] = min(c[2], lon); c[3] = max(c[3], lon)
+    # margem: o território da UF vai além dos centróides dos municípios das bordas
+    return {uf: (a - MARGEM_UF, b + MARGEM_UF, c - MARGEM_UF, d + MARGEM_UF)
+            for uf, (a, b, c, d) in caixas.items()}
+
+
+def carrega_municipios():
+    """
+    Centróides do IBGE por código de município. Baixa uma vez e guarda em
+    MUNICIPIOS_CACHE, para as execuções seguintes funcionarem sem internet.
+    """
+    texto = None
+    if os.path.exists(MUNICIPIOS_CACHE):
+        print(f"Centróides municipais: usando o cache local ({MUNICIPIOS_CACHE}).")
+        texto = le_arquivo(MUNICIPIOS_CACHE)
+    else:
+        print(f"Baixando centróides municipais (uma vez só): {MUNICIPIOS_URL}")
+        req = urllib.request.Request(MUNICIPIOS_URL, headers={"User-Agent": "escolas-quilombolas/1.0"})
+        for tentativa in range(1, 4):
+            try:
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    texto = decodifica(resp.read())
+                break
+            except Exception as e:
+                if tentativa == 3:
+                    raise RuntimeError(
+                        f"não foi possível baixar os centróides municipais ({e}). Baixe o arquivo à mão "
+                        f"de {MUNICIPIOS_URL} e salve como '{MUNICIPIOS_CACHE}' na pasta do script.") from e
+                print(f"  falha no download ({e}); nova tentativa {tentativa + 1}/3…")
+                time.sleep(5 * tentativa)
+        try:
+            with open(MUNICIPIOS_CACHE, 'w', encoding='utf-8') as f:
+                f.write(texto)
+            print(f"  guardado em {MUNICIPIOS_CACHE} (as próximas execuções não precisam de internet).")
+        except OSError:
+            pass
+
+    por_codigo = {}
+    for linha in csv.DictReader(io.StringIO(texto)):
+        try:
+            por_codigo[linha['codigo_ibge']] = (float(linha['latitude']), float(linha['longitude']))
+        except (KeyError, ValueError, TypeError):
+            continue
+    if not por_codigo:
+        raise RuntimeError(f"o arquivo de centróides ({MUNICIPIOS_CACHE}) não tem as colunas esperadas "
+                           "(codigo_ibge, latitude, longitude).")
+    print(f"{len(por_codigo)} municípios carregados.")
+    return por_codigo
+
+
+# ----------------------------------------------------------------------
+# COORDENADAS POR ESCOLA (arquivo opcional)
+# ----------------------------------------------------------------------
+def acha_coluna(cabecalho, *palavras):
+    """Encontra a coluna cujo nome contém uma das palavras (sem acento, maiúsculas)."""
+    def normaliza(s):
+        s = s.upper()
+        for a, b in (('Á', 'A'), ('À', 'A'), ('Ã', 'A'), ('Â', 'A'), ('É', 'E'), ('Ê', 'E'),
+                     ('Í', 'I'), ('Ó', 'O'), ('Õ', 'O'), ('Ô', 'O'), ('Ú', 'U'), ('Ç', 'C')):
+            s = s.replace(a, b)
+        return s
+    normal = [normaliza(h) for h in cabecalho]
+    for palavra in palavras:
+        for i, h in enumerate(normal):
+            if palavra in h:
+                return i
+    return None
+
+
+def numero_solto(txt):
+    """
+    Lê uma coordenada que pode vir em vários formatos.
+
+    Além do formato normal ('-2.491758'), trata o caso de a planilha ter lido o
+    ponto decimal como separador de milhar, transformando o número no inteiro
+    -2491758333. Nesse caso devolvemos os dígitos crus, para que quem chamar
+    tente recolocar a vírgula validando contra o município.
+    """
+    if txt is None:
+        return None, None
     s = str(txt).strip().replace('°', '').replace(' ', '')
     if s in ('', '*'):
-        return None
-    neg = s.startswith('-')
-    digitos = re.sub(r'\D', '', s)
-    if not digitos:
-        return None
+        return None, None
+    direto = None
+    try:
+        direto = float(s.replace(',', '.'))
+    except ValueError:
+        pass
+    return direto, ('-' if s.startswith('-') else '') + re.sub(r'\D', '', s)
+
+
+def recupera_coord(txt, ref, e_lat):
+    """
+    Devolve a coordenada em grau decimal, ou None se não der para confiar.
+
+    Devolve também se o valor veio pronto ou teve que ser reconstruído, no par
+    (valor, 'direto' | 'reconstruido' | None).
+    """
+    direto, digitos = numero_solto(txt)
+    if digitos is None:
+        return None, None
 
     def faixa_ok(x):
         return (-35.5 <= x <= 6.0) if e_lat else (-75.0 <= x <= -30.0)
 
-    # 1) o texto já é uma coordenada válida (ex.: '-2.491758' ou '-2,491758')
-    try:
-        direto = float(s.replace(',', '.'))
-        if faixa_ok(direto):
-            return direto
-    except ValueError:
-        pass
+    if direto is not None and faixa_ok(direto):
+        return direto, 'direto'
 
-    # 2) inteiro corrompido: recolocamos o ponto decimal. Candidatos = 1 ou 2 dígitos na parte inteira; para
-    #    latitudes entre 0 e -1 (Amapá/Pará) o zero inicial some, então também testamos "0,xxxx" (o INEP usa 9 casas).
+    neg = digitos.startswith('-')
+    digitos = digitos.lstrip('-')
+    if not digitos:
+        return None, None
+
+    # inteiro corrompido: recolocamos o ponto decimal. Candidatos = 1 ou 2 dígitos na parte
+    # inteira; para latitudes entre 0 e -1 (Amapá/Pará) o zero inicial some, então também
+    # testamos "0,xxxx" (o INEP usa 9 casas decimais).
     ref_alvo = (ref[0] if e_lat else ref[1]) if ref else None
     candidatos = []
     for k in ((1, 2) if e_lat else (2, 1)):
@@ -241,6 +424,11 @@ def recupera_coord(txt, ref, e_lat):
             if casas >= len(digitos):
                 candidatos.append(int(digitos) / 10 ** casas)
 
+    # Entre os candidatos válidos, fica o mais próximo do centróide do município.
+    # Para coordenadas perto do equador a recuperação é ambígua por natureza:
+    # '-15437582' pode ser -0,154 ou -0,0154, e só o município desempata. Em teste
+    # com 594 coordenadas corrompidas, 593 voltaram exatas e uma caiu a 7 km da
+    # posição real — sempre dentro do município certo, que é o que importa aqui.
     melhor, melhor_dist = None, None
     for cand in candidatos:
         if neg:
@@ -248,32 +436,69 @@ def recupera_coord(txt, ref, e_lat):
         if not faixa_ok(cand):
             continue
         if ref_alvo is None:
-            return cand
+            return cand, 'reconstruido'
         dist = abs(cand - ref_alvo)
         if dist <= TOLERANCIA_GRAUS and (melhor_dist is None or dist < melhor_dist):
             melhor, melhor_dist = cand, dist
-    return melhor
+    return melhor, ('reconstruido' if melhor is not None else None)
 
 
-def carrega_municipios():
-    print(f"Baixando centróides municipais: {MUNICIPIOS_URL}")
-    por_codigo = {}
-    for linha in csv.DictReader(io.StringIO(baixar_texto(MUNICIPIOS_URL))):
-        por_codigo[linha['codigo_ibge']] = (float(linha['latitude']), float(linha['longitude']))
-    print(f"{len(por_codigo)} municípios carregados.")
-    return por_codigo
+def le_coordenadas(caminho, por_codigo):
+    """Arquivo opcional com coordenadas por escola (ex.: Catálogo de Escolas do INEP)."""
+    leitor, cabecalho = abre_csv(caminho, "tabela de coordenadas")
+    iCod = acha_coluna(cabecalho, 'CO_ENTIDADE', 'CODIGO INEP', 'CODIGO DA ESCOLA', 'COD_INEP', 'CODIGO')
+    iLat = acha_coluna(cabecalho, 'LATITUDE', 'LAT')
+    iLon = acha_coluna(cabecalho, 'LONGITUDE', 'LONG', 'LON')
+    if iCod is None or iLat is None or iLon is None:
+        raise RuntimeError(
+            f"a tabela de coordenadas precisa de uma coluna de código INEP, uma de latitude e uma de "
+            f"longitude. Encontrei: código={cabecalho[iCod] if iCod is not None else 'nenhuma'}, "
+            f"latitude={cabecalho[iLat] if iLat is not None else 'nenhuma'}, "
+            f"longitude={cabecalho[iLon] if iLon is not None else 'nenhuma'}.")
+    print(f"  colunas usadas: {cabecalho[iCod]}, {cabecalho[iLat]}, {cabecalho[iLon]}")
+    fora = {}
+    for linha in leitor:
+        if max(iCod, iLat, iLon) >= len(linha):
+            continue
+        cod = so_digitos(linha[iCod])
+        if cod:
+            fora[cod] = (linha[iLat], linha[iLon])
+    print(f"  {len(fora)} escolas com coordenada no arquivo.")
+    return fora
 
 
-def geocodifica(registros, por_codigo):
-    sem_geo = suspeitas = 0
+# ----------------------------------------------------------------------
+# GEOCODIFICAÇÃO
+# ----------------------------------------------------------------------
+def geocodifica(registros, por_codigo, coords_escola):
+    """
+    Define lat/lon e fonteGeo de cada escola:
+        'escola'    -> coordenada própria (colunas LATITUDE/LONGITUDE da tabela,
+                       ou o arquivo passado em --coordenadas, que tem prioridade)
+        'municipio' -> centróide do município (quando a escola não tem coordenada)
+        'nenhuma'   -> nem uma coisa nem outra; fica fora do mapa
+    """
+    caixas = caixas_por_uf(por_codigo)
+    sem_geo = suspeitas = reconstruidas = 0
+    fora_da_uf = []
     for r in registros:
         ref = por_codigo.get(r.get('ibge'))
-        lat = recupera_coord(r.get('latTxt'), ref, True)
-        lon = recupera_coord(r.get('lonTxt'), ref, False)
-        if ref and lat is not None and lon is not None and \
-                (abs(lat - ref[0]) > TOLERANCIA_GRAUS or abs(lon - ref[1]) > TOLERANCIA_GRAUS):
-            suspeitas += 1          # ponto longe demais do próprio município: provável erro de digitação
-            lat = lon = None
+        lat = lon = None
+        # o arquivo externo ganha da coluna da tabela: quem o passou quis corrigir algo
+        bruto = (coords_escola.get(r.get('cod')) if coords_escola else None) \
+            or ((r.get('latTxt'), r.get('lonTxt')) if r.get('latTxt') and r.get('lonTxt') else None)
+        if bruto:
+            lat, orig_lat = recupera_coord(bruto[0], ref, True)
+            lon, orig_lon = recupera_coord(bruto[1], ref, False)
+            if lat is not None and lon is not None:
+                caixa = caixas.get((r.get('ibge') or '')[:2])
+                if caixa and not (caixa[0] <= lat <= caixa[1] and caixa[2] <= lon <= caixa[3]):
+                    suspeitas += 1          # coordenada fora da própria UF: erro de fato
+                    if len(fora_da_uf) < 5:
+                        fora_da_uf.append(f"{r.get('escola')} ({r.get('municipio')}/{r.get('uf')}): {lat}, {lon}")
+                    lat = lon = None
+                elif 'reconstruido' in (orig_lat, orig_lon):
+                    reconstruidas += 1
         if lat is not None and lon is not None:
             r['lat'], r['lon'], r['fonteGeo'] = round(lat, 6), round(lon, 6), 'escola'
         elif ref:
@@ -281,48 +506,81 @@ def geocodifica(registros, por_codigo):
         else:
             r['lat'], r['lon'], r['fonteGeo'] = None, None, 'nenhuma'
             sem_geo += 1
+
+    proprias = sum(1 for r in registros if r['fonteGeo'] == 'escola')
+    mun = sum(1 for r in registros if r['fonteGeo'] == 'municipio')
+    if reconstruidas:
+        print(f"{reconstruidas} coordenada(s) vieram como inteiro (separador decimal perdido) e foram reconstruídas.")
     if suspeitas:
-        print(f"AVISO: {suspeitas} coordenada(s) muito distantes do município foram descartadas (uso do centróide).")
-    print(f"Georreferenciamento: {sum(1 for r in registros if r['fonteGeo']=='escola')} pela própria coordenada, "
-          f"{sum(1 for r in registros if r['fonteGeo']=='municipio')} por centróide municipal, {sem_geo} sem localização.")
-    return sem_geo
+        print(f"AVISO: {suspeitas} coordenada(s) caíram fora da própria UF e foram descartadas (uso do centróide):")
+        for x in fora_da_uf:
+            print(f"  - {x}")
+        if suspeitas > len(fora_da_uf):
+            print(f"  … e mais {suspeitas - len(fora_da_uf)}.")
+    print(f"Localização: {proprias} pela coordenada da escola, {mun} pelo centróide do município, {sem_geo} sem localização.")
+    n_mun = len({r['ibge'] for r in registros if r.get('fonteGeo') == 'municipio'})
+    if proprias == 0:
+        print(f"  Esta tabela não traz latitude/longitude, então o mapa mostra {n_mun} círculos (um por")
+        print(f"  município), com o tamanho proporcional ao número de escolas. Para ver escola por escola,")
+        print(f"  use a versão completa da tabela de Escola ou passe --coordenadas.")
+    elif mun:
+        print(f"  O mapa mostra {proprias} pontos de escola mais {n_mun} círculo(s) de município, para as")
+        print(f"  {mun} escolas sem coordenada própria.")
+    return sem_geo, proprias
 
 
 # ----------------------------------------------------------------------
-# LEITURA DA PLANILHA
+# LEITURA DAS TABELAS DO CENSO
 # ----------------------------------------------------------------------
-def baixa_escolas(fonte=None):
-    fonte = fonte or CSV_URL
-    print(f"Lendo planilha: {fonte}")
-    texto = baixar_texto(fonte)
-    if texto.lstrip()[:15].lower().startswith(('<!doctype', '<html')):
-        raise RuntimeError("O Google devolveu uma página HTML em vez do CSV: confira se a planilha está compartilhada como "
-                           "'Qualquer pessoa com o link' (leitor) e se o GID é o da aba certa.")
-    linhas = list(csv.reader(io.StringIO(texto)))
-    if not linhas:
-        raise RuntimeError("Planilha vazia ou inacessível (confira se ela está pública).")
-
-    cabecalho = [h.replace('\xa0', ' ').strip() for h in linhas[0]]
+def mapeia_colunas(cabecalho, campos, criticas, rotulo):
+    ausentes = [c for c in criticas if c not in cabecalho]
+    if ausentes:
+        raise RuntimeError(f"a {rotulo} não parece ser a tabela do Censo: faltam as colunas {ausentes}. "
+                           "Confira se o arquivo é o certo e se não foi aberto e salvo por um editor "
+                           "que mexeu no cabeçalho.")
     indice, faltando = {}, []
-    for coluna, campo in CAMPOS.items():
+    for coluna, campo in campos.items():
         if coluna in cabecalho:
             indice[campo] = cabecalho.index(coluna)
         else:
             faltando.append(coluna)
+    opcionais_ausentes = [c for c in faltando if c in OPCIONAIS]
+    faltando = [c for c in faltando if c not in OPCIONAIS]
     if faltando:
-        print("AVISO: colunas ausentes na planilha (campos ficarão 'sem dado'):")
+        print(f"AVISO: colunas ausentes na {rotulo} (os campos ficarão 'sem dado'):")
         for c in faltando:
             parecida = difflib.get_close_matches(c, cabecalho, n=1, cutoff=0.8)
-            print(f"  - {c}" + (f"   (parecida na planilha: {parecida[0]})" if parecida else ""))
-    criticas = ['NO_ENTIDADE', 'CO_ENTIDADE', 'CO_MUNICIPIO', 'SG_UF'] + (['TP_LOCALIZACAO_DIFERENCIADA'] if SO_QUILOMBOLAS else [])
-    ausentes = [c for c in criticas if c not in cabecalho]
-    if ausentes:
-        raise RuntimeError(f"A planilha não parece ser a tabela de Escolas do Censo (faltam colunas essenciais: {ausentes}). "
-                           "Confira se o link está público e se a aba certa foi indicada em GID.")
+            print(f"  - {c}" + (f"   (parecida no arquivo: {parecida[0]})" if parecida else ""))
+    if 'LATITUDE' in opcionais_ausentes:
+        print("  (esta tabela não traz LATITUDE/LONGITUDE — é a versão anonimizada dos microdados. "
+              "O mapa vai agrupar as escolas por município.)")
+    return indice
 
-    registros, excluidas, duplicadas, por_cod = [], 0, 0, {}
-    for linha in linhas[1:]:
+
+def valor(campo, bruto):
+    if campo in TEXTO:
+        if campo in ('ibge', 'cod'):
+            bruto = so_digitos(bruto)
+        return bruto if bruto not in ('', '*') else None
+    if campo in INTEIROS:
+        return para_int(bruto)
+    return para_bin(bruto)
+
+
+def le_escolas(caminho, universo):
+    leitor, cabecalho = abre_csv(caminho, "tabela de Escola")
+    indice = mapeia_colunas(
+        cabecalho, CAMPOS_ESCOLA,
+        ['NO_ENTIDADE', 'CO_ENTIDADE', 'CO_MUNICIPIO', 'SG_UF', 'TP_LOCALIZACAO_DIFERENCIADA'],
+        "tabela de Escola")
+    iLD = cabecalho.index('TP_LOCALIZACAO_DIFERENCIADA')
+
+    registros, fora, repetidas, por_cod = [], 0, 0, {}
+    for linha in leitor:
         if not any(c.strip() for c in linha):
+            continue
+        if len(linha) <= iLD or para_int(linha[iLD]) not in universo:
+            fora += 1
             continue
 
         def bruto(campo):
@@ -333,23 +591,8 @@ def baixa_escolas(fonte=None):
 
         if bruto('escola') in ('', '*'):
             continue
-        if SO_QUILOMBOLAS and para_int(bruto('locDif')) not in CODIGOS_QUILOMBOLAS:
-            excluidas += 1
-            continue
-        r = {}
-        for coluna, campo in CAMPOS.items():
-            if campo in ('latTxt', 'lonTxt'):
-                r[campo] = bruto(campo)
-            elif campo in TEXTO:
-                v = bruto(campo)
-                if campo in ('ibge', 'cod') and v:      # '1505008.0' ou '1.505.008' -> '1505008'
-                    v = re.sub(r'\.0+$', '', v)
-                    v = re.sub(r'\D', '', v)
-                r[campo] = v if v not in ('', '*') else None
-            elif campo in INTEIROS:
-                r[campo] = para_int(bruto(campo))
-            else:
-                r[campo] = para_bin(bruto(campo))
+
+        r = {campo: valor(campo, bruto(campo)) for campo in indice}
 
         # campos derivados
         recursos = [r.get(c) for c in ACC_BRUTOS if c != 'accInexistente']
@@ -359,14 +602,13 @@ def baixa_escolas(fonte=None):
             r['acess'] = 0
         else:
             r['acess'] = None
-        profs = [r.get(c) for c in PROFS]
-        informados = [p for p in profs if p is not None]
+        informados = [r.get(c) for c in PROFS if r.get(c) is not None]
         r['profTotal'] = sum(informados) if informados else None
 
         # mesma escola em mais de uma linha (ex.: anos diferentes): fica a do Censo mais recente
         chave = r.get('cod')
         if chave and chave in por_cod:
-            duplicadas += 1
+            repetidas += 1
             i = por_cod[chave]
             if (r.get('ano') or '') > (registros[i].get('ano') or ''):
                 registros[i] = r
@@ -375,16 +617,62 @@ def baixa_escolas(fonte=None):
             por_cod[chave] = len(registros)
         registros.append(r)
 
-    print(f"{len(registros)} escolas lidas ({excluidas} fora do recorte quilombola, {duplicadas} linhas repetidas da mesma escola descartadas).")
-    ufs = {}
-    for r in registros:
-        ufs[r['uf'] or '—'] = ufs.get(r['uf'] or '—', 0) + 1
-    print("Por UF: " + ", ".join(f"{uf}={n}" for uf, n in sorted(ufs.items())))
+    print(f"{len(registros)} escolas no universo ({fora} fora do recorte, {repetidas} linhas repetidas descartadas).")
     return registros
 
 
+def le_turmas(caminho, registros):
+    """Cruza a tabela de Turma pelo código da escola."""
+    leitor, cabecalho = abre_csv(caminho, "tabela de Turma")
+    indice = mapeia_colunas(cabecalho, CAMPOS_TURMA, ['CO_ENTIDADE'], "tabela de Turma")
+    iCO = cabecalho.index('CO_ENTIDADE')
+    por_cod = {r['cod']: r for r in registros if r.get('cod')}
+    casados = 0
+    for linha in leitor:
+        if len(linha) <= iCO:
+            continue
+        r = por_cod.get(so_digitos(linha[iCO]))
+        if r is None:
+            continue
+        for campo, i in indice.items():
+            if i < len(linha):
+                r[campo] = para_int((linha[i] or '').strip())
+        casados += 1
+    print(f"Turmas cruzadas para {casados} de {len(registros)} escolas.")
+    if casados == 0:
+        raise RuntimeError("nenhuma escola casou com a tabela de Turma. As duas tabelas são do mesmo ano?")
+    derivados_de_turma(registros)
+    return casados
+
+
+def derivados_de_turma(registros):
+    """
+    Campos que só fazem sentido depois do cruzamento com a tabela de Turma.
+
+    'multisseriada' importa no recorte quilombola: a maioria dessas escolas junta
+    séries diferentes na mesma turma. Quando isso acontece, o Censo costuma lançar
+    a turma inteira nos anos finais, então uma escola que ensina do 1º ao 9º ano
+    pode aparecer com zero turmas de anos iniciais. Por isso o painel marca a
+    escola como multisseriada em vez de fingir que a divisão AI/AF é exata.
+    """
+    n = 0
+    for r in registros:
+        fund = r.get('turFund')
+        multi = (r.get('turFundAIMulti') or 0) + (r.get('turFundAFMulti') or 0)
+        if fund is None:
+            r['multisseriada'] = None
+        elif multi > 0:
+            r['multisseriada'] = 1
+            n += 1
+        elif fund > 0:
+            r['multisseriada'] = 0
+        else:
+            r['multisseriada'] = None      # escola sem fundamental: a pergunta não se aplica
+    print(f"{n} escola(s) com turma multisseriada no ensino fundamental.")
+
+
 # ----------------------------------------------------------------------
-# GERAÇÃO DO index.html
+# GERAÇÃO DO PAINEL
 # ----------------------------------------------------------------------
 def hoje_br():
     try:
@@ -394,105 +682,151 @@ def hoje_br():
         return datetime.now().strftime('%d/%m/%Y')
 
 
-def le_publicado():
-    """Hash e total do painel já publicado (meta tags do index.html), se existir."""
-    try:
-        with open(OUTPUT_PATH, encoding='utf-8') as f:
-            html = f.read(6000)
-    except OSError:
-        return None, None
-    h = re.search(r'name="dados-hash" content="([0-9a-f]+)"', html)
-    n = re.search(r'name="dados-total" content="(\d+)"', html)
-    return (h.group(1) if h else None), (int(n.group(1)) if n else None)
+def monta_colunar(registros):
+    """
+    Converte a lista de registros em um pacote colunar: um array por campo, em
+    vez de um objeto por escola. O template remonta as linhas ao abrir a página.
+
+    Três codificações, escolhidas por tipo de campo (medido nos dados de 2025,
+    12.472 escolas e 123 campos):
+
+        objetos por linha ..... 24,7 MB
+        colunar simples ....... 4,3 MB
+        colunar como abaixo ... 3,0 MB
+
+      - 'bin'  campos 0/1: viram uma string, um caractere por escola
+               ('1' sim, '0' não, '.' sem dado). 70 dos 123 campos são assim, e
+               guardá-los como array custaria dois caracteres por escola só de
+               vírgula e valor.
+      - 'dic'  texto muito repetido (região, UF, município): lista de valores
+               distintos + índices.
+      - 'num'  o resto: array puro, com null para sem dado.
+    """
+    campos = []
+    for r in registros:
+        for c in r:
+            if c not in campos and c not in OCULTOS:
+                campos.append(c)
+
+    DICIONARIO = {'ano', 'regiao', 'uf', 'municipio', 'fonteGeo'}
+    colunas, tipos = {}, {}
+    for c in campos:
+        vals = [r.get(c) for r in registros]
+        if c in DICIONARIO:
+            uniq = sorted({v for v in vals if v is not None})
+            pos = {v: i for i, v in enumerate(uniq)}
+            colunas[c] = {'d': uniq, 'i': [pos[v] if v is not None else -1 for v in vals]}
+            tipos[c] = 'dic'
+        elif all(v in (0, 1, None) for v in vals):
+            colunas[c] = ''.join('1' if v == 1 else ('0' if v == 0 else '.') for v in vals)
+            tipos[c] = 'bin'
+        else:
+            colunas[c] = vals
+            tipos[c] = 'num'
+    return {'n': len(registros), 'campos': campos, 'tipos': tipos, 'colunas': colunas}
 
 
-def gera_pagina(registros, sem_geo):
+def gera_pagina(registros, sem_geo, proprias, saida, fonte_escola, fonte_turma):
     with open(TEMPLATE_PATH, encoding='utf-8') as f:
         tpl = f.read()
 
-    # JSON compacto, sem campos vazios (o template trata ausente = sem dado)
-    enxutos = [{k: v for k, v in r.items() if v is not None} for r in registros]
-    dados = json.dumps(enxutos, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+    pacote = monta_colunar(registros)
+    dados = json.dumps(pacote, ensure_ascii=False, separators=(',', ':'))
     dados = dados.replace('<', '\\u003c').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')
 
-    # dicionário campo interno -> coluna do INEP, usado pelo botão "Base completa em CSV"
-    ocultos = {'latTxt', 'lonTxt', 'endereco', 'bairro', 'ufNome', *ACC_BRUTOS}
-    campos = {campo: coluna for coluna, campo in CAMPOS.items() if campo not in ocultos}
-    campos.update({'lat': 'LATITUDE_TRATADA', 'lon': 'LONGITUDE_TRATADA', 'fonteGeo': 'ORIGEM_COORDENADA',
-                   'acess': 'ACESSIBILIDADE_ALGUM_RECURSO (derivado)', 'profTotal': 'PROFISSIONAIS_TOTAL (derivado)'})
-    campos_json = json.dumps(campos, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
+    campos_inep = {campo: coluna for coluna, campo in
+                   list(CAMPOS_ESCOLA.items()) + list(CAMPOS_TURMA.items()) if campo not in OCULTOS}
+    campos_inep.update({'lat': 'LATITUDE_USADA', 'lon': 'LONGITUDE_USADA',
+                        'fonteGeo': 'ORIGEM_COORDENADA',
+                        'acess': 'ACESSIBILIDADE_ALGUM_RECURSO (derivado)',
+                        'profTotal': 'PROFISSIONAIS_TOTAL (derivado)'})
+    campos_json = json.dumps(campos_inep, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
 
-    # o hash cobre dados + template + link: se nada mudou, não regeneramos (e não há commit)
-    h = hashlib.sha256((tpl + dados + campos_json + str(sem_geo) + LINK_PLANILHA).encode('utf-8')).hexdigest()[:16]
-    h_antigo, _ = le_publicado()
-    if h == h_antigo:
-        print("Sem alterações nos dados nem no template: index.html mantido como está.")
-        return False
-
-    municipios = len({r['ibge'] for r in registros if r['ibge']})
-    ufs = len({r['uf'] for r in registros if r['uf']})
-    anos = sorted({r['ano'] for r in registros if r['ano']})
+    municipios = len({r['ibge'] for r in registros if r.get('ibge')})
+    ufs = len({r['uf'] for r in registros if r.get('uf')})
+    anos = sorted({r['ano'] for r in registros if r.get('ano')})
     ano = anos[-1] if anos else '—'
-    nota_geo = (f"Nesta geração, {sem_geo} escola(s) sem coordenada nem município identificável ficaram fora do mapa."
-                if sem_geo else "Todas as escolas desta base puderam ser posicionadas no mapa.")
+    quilombolas = sum(1 for r in registros if r.get('locDif') == 3)
+
+    if proprias:
+        nota_geo = (f"Nesta base, {proprias} escola(s) têm coordenada própria e "
+                    f"{sum(1 for r in registros if r['fonteGeo'] == 'municipio')} estão no centróide do município.")
+    else:
+        nota_geo = ("Os microdados do Censo não trazem latitude e longitude das escolas, então o mapa trabalha "
+                    "na granularidade que os dados têm: um círculo por município, proporcional ao número de escolas.")
+    if sem_geo:
+        nota_geo += f" {sem_geo} escola(s) ficaram sem localização e não aparecem no mapa."
+
+    arquivos = os.path.basename(fonte_escola) + (f" e {os.path.basename(fonte_turma)}" if fonte_turma else "")
 
     subs = {
-        '__TOTAL_ESCOLAS__': f'{len(registros):,}'.replace(',', '.'),
+        '__TOTAL_ESCOLAS__': f'{quilombolas:,}'.replace(',', '.'),
+        '__TOTAL_UNIVERSO__': f'{len(registros):,}'.replace(',', '.'),
         '__TOTAL_MUNICIPIOS__': f'{municipios:,}'.replace(',', '.'),
         '__TOTAL_UFS__': str(ufs),
-        '__TOTAL_BRUTO__': str(len(registros)),
-        '__HASH_DADOS__': h,
         '__ANO_CENSO__': str(ano),
-        '__NAO_GEOCODIFICADOS__': nota_geo,
+        '__NOTA_GEO__': nota_geo,
         '__DATA_GERACAO__': hoje_br(),
-        '__LINK_PLANILHA__': LINK_PLANILHA or '#',
+        '__ARQUIVOS_FONTE__': arquivos,
+        '__LINK_INEP__': LINK_INEP,
     }
     for k, v in subs.items():
         tpl = tpl.replace(k, v)
     restantes = re.findall(r'__[A-Z_]+__', tpl.replace('__DATA_JSON__', '').replace('__CAMPOS_JSON__', ''))
     if restantes:
-        raise RuntimeError(f"Placeholders não substituídos: {restantes}")
-    tpl = tpl.replace('__CAMPOS_JSON__', campos_json).replace('__DATA_JSON__', dados)   # por último: o JSON nunca passa pelas outras trocas
+        raise RuntimeError(f"placeholders não substituídos no template: {restantes}")
+    tpl = tpl.replace('__CAMPOS_JSON__', campos_json).replace('__DATA_JSON__', dados)
 
-    with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
+    with open(saida, 'w', encoding='utf-8') as f:
         f.write(tpl)
-    print(f"{OUTPUT_PATH} gerado com {len(registros)} escolas.")
-    return True
+    bruto = len(tpl.encode('utf-8'))
+    comprimido = len(gzip.compress(tpl.encode('utf-8'), 6))
+    print(f"\n{saida} gerado: {len(registros)} escolas ({quilombolas} quilombolas), "
+          f"{bruto/1e6:.2f} MB ({comprimido/1e6:.2f} MB quando servido comprimido).")
+    print("Abra o arquivo no navegador para conferir, depois publique-o.")
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Regenera o index.html do painel a partir da planilha.")
-    ap.add_argument("--csv", help="caminho local (ou URL) de um CSV, no lugar da planilha configurada")
-    ap.add_argument("--forcar", action="store_true", help="ignora a trava de queda brusca no total de escolas")
+    ap = argparse.ArgumentParser(
+        description="Gera o painel a partir dos microdados do Censo Escolar baixados do INEP.",
+        epilog="Exemplo: python3 atualizar_dados.py --escola Tabela_Escola_2025.csv --turma Tabela_Turma_2025.csv")
+    ap.add_argument("--escola", required=True, help="CSV da tabela de Escola (obrigatório)")
+    ap.add_argument("--turma", help="CSV da tabela de Turma (opcional; habilita a seção de EJA)")
+    ap.add_argument("--coordenadas", help="CSV opcional com código INEP, latitude e longitude por escola")
+    ap.add_argument("--saida", default=SAIDA_PADRAO, help=f"arquivo a gerar (padrão: {SAIDA_PADRAO})")
+    ap.add_argument("--so-quilombolas", action="store_true",
+                    help="carrega apenas escolas quilombolas (painel menor, sem comparação entre tipos)")
     args = ap.parse_args()
 
-    if not args.csv and SHEET_ID.startswith("COLE_AQUI"):
-        print("ERRO: preencha SHEET_ID (no topo do script ou como variável de ambiente) ou use --csv. Veja o README.")
-        sys.exit(1)
+    universo = {3} if args.so_quilombolas else UNIVERSO
 
     try:
-        registros = baixa_escolas(args.csv)
+        if not os.path.exists(TEMPLATE_PATH):
+            raise RuntimeError(f"o arquivo {TEMPLATE_PATH} precisa estar na mesma pasta que o script.")
+
+        registros = le_escolas(args.escola, universo)
         if len(registros) < MINIMO_REGISTROS:
             raise RuntimeError(
-                f"só vieram {len(registros)} registros (mínimo esperado: {MINIMO_REGISTROS}). "
-                f"{OUTPUT_PATH} não foi alterado. Se o recorte é menor de propósito, ajuste MINIMO_REGISTROS.")
-        _, total_antigo = le_publicado()
-        if not args.forcar and total_antigo and len(registros) < total_antigo * (1 - QUEDA_MAXIMA):
-            raise RuntimeError(
-                f"a base caiu de {total_antigo} para {len(registros)} registros (mais de {int(QUEDA_MAXIMA * 100)}%). "
-                f"{OUTPUT_PATH} não foi alterado. Se a queda é legítima, rode com --forcar.")
+                f"só vieram {len(registros)} escolas (mínimo esperado: {MINIMO_REGISTROS}). O arquivo pode estar "
+                f"truncado ou ser a tabela errada. {args.saida} não foi alterado. Se o recorte é pequeno de "
+                f"propósito, ajuste MINIMO_REGISTROS no topo do script.")
+
+        if args.turma:
+            le_turmas(args.turma, registros)
+        else:
+            print("Sem --turma: o painel sairá sem a seção de EJA.")
 
         por_codigo = carrega_municipios()
-        sem_geo = geocodifica(registros, por_codigo)
+        coords = le_coordenadas(args.coordenadas, por_codigo) if args.coordenadas else {}
+        sem_geo, proprias = geocodifica(registros, por_codigo, coords)
 
-        # remove campos de trabalho (não vão para o JSON público)
         for r in registros:
-            for c in ('latTxt', 'lonTxt', 'endereco', 'bairro', 'ufNome') + ACC_BRUTOS:
+            for c in OCULTOS:
                 r.pop(c, None)
 
-        gera_pagina(registros, sem_geo)
-    except (RuntimeError, OSError) as e:      # OSError cobre falhas de rede/arquivo
-        print(f"ERRO: {e}")
+        gera_pagina(registros, sem_geo, proprias, args.saida, args.escola, args.turma)
+    except (RuntimeError, OSError) as e:
+        print(f"\nERRO: {e}")
         sys.exit(1)
 
 
