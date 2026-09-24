@@ -150,6 +150,9 @@
         section.bloco{padding:32px 0}
     }
     section.bloco[id]{scroll-margin-top:56px}   /* a faixa de recorte é sticky: âncoras param abaixo dela */
+    /* o widget do VLibras é fixo na tela; o Leaflet sobe até z-index 1000 nos seus
+       controles, então o widget precisa ficar acima para não sumir atrás do mapa */
+    div[vw]{z-index:2000}
     :focus-visible{outline:2px solid var(--dourado);outline-offset:2px}
     table.tabela-dados th:focus-visible{outline-offset:-3px}
 </style>
@@ -198,7 +201,7 @@
             <span><strong>Página gerada em:</strong> __DATA_GERACAO__</span>
             <span><strong>Fonte:</strong> microdados do Censo Escolar __ANO_CENSO__ — INEP</span>
             <span><strong>Escolas quilombolas:</strong> __TOTAL_ESCOLAS__ · __TOTAL_MUNICIPIOS__ municípios · __TOTAL_UFS__ UF</span>
-            <span><strong>Base para comparação:</strong> __TOTAL_UNIVERSO__ escolas em território diferenciado</span>
+            <span><strong>Base para comparação:</strong> __TOTAL_UNIVERSO__ escolas em território diferenciado · __MUNICIPIOS_UNIVERSO__ municípios · __UFS_UNIVERSO__ UF</span>
         </div>
     </div>
 </header>
@@ -581,7 +584,7 @@
             <div class="cartao-fonte">
                 <h3>Baixar e conferir</h3>
                 <a class="link-fonte" href="__LINK_INEP__" target="_blank" rel="noopener">↗ Microdados do Censo Escolar — INEP</a>
-                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-educacionais/censo-escolar" target="_blank" rel="noopener">↗ Censo Escolar — página oficial</a>
+                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-indicadores/censo-escolar" target="_blank" rel="noopener">↗ Censo Escolar — página oficial</a>
                 <div class="separador"></div>
                 <p style="font-size:13px;margin-bottom:12px;">Os botões abaixo baixam a base inteira carregada nesta página, com os nomes de coluna do INEP. Para a seleção filtrada, use os botões na seção <a href="#tabela" style="color:var(--verde)">Relação das escolas</a>.</p>
                 <div class="lista-download">
@@ -1534,6 +1537,20 @@ ligaEventos();
 initMapa();
 atualiza();
 setTimeout(()=>mapa.invalidateSize(),400);
+</script>
+
+<!-- VLibras: tradução do conteúdo para Libras. Carrega de vlibras.gov.br; quando a
+     página é aberta sem internet o script simplesmente não carrega e o resto do
+     painel continua funcionando. -->
+<div vw class="enabled">
+  <div vw-access-button class="active"></div>
+  <div vw-plugin-wrapper>
+    <div class="vw-plugin-top-wrapper"></div>
+  </div>
+</div>
+<script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
+<script>
+  try { new window.VLibras.Widget('https://vlibras.gov.br/app'); } catch (e) {}
 </script>
 </body>
 </html>

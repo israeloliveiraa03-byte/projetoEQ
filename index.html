@@ -150,6 +150,9 @@
         section.bloco{padding:32px 0}
     }
     section.bloco[id]{scroll-margin-top:56px}   /* a faixa de recorte é sticky: âncoras param abaixo dela */
+    /* o widget do VLibras é fixo na tela; o Leaflet sobe até z-index 1000 nos seus
+       controles, então o widget precisa ficar acima para não sumir atrás do mapa */
+    div[vw]{z-index:2000}
     :focus-visible{outline:2px solid var(--dourado);outline-offset:2px}
     table.tabela-dados th:focus-visible{outline-offset:-3px}
 </style>
@@ -197,8 +200,8 @@
         <div class="header-meta">
             <span><strong>Página gerada em:</strong> 24/09/2026</span>
             <span><strong>Fonte:</strong> microdados do Censo Escolar 2025 — INEP</span>
-            <span><strong>Escolas quilombolas:</strong> 2.737 · 1.732 municípios · 27 UF</span>
-            <span><strong>Base para comparação:</strong> 12.472 escolas em território diferenciado</span>
+            <span><strong>Escolas quilombolas:</strong> 2.737 · 699 municípios · 24 UF</span>
+            <span><strong>Base para comparação:</strong> 12.472 escolas em território diferenciado · 1.732 municípios · 27 UF</span>
         </div>
     </div>
 </header>
@@ -1535,7 +1538,11 @@ initMapa();
 atualiza();
 setTimeout(()=>mapa.invalidateSize(),400);
 </script>
-</body> <div vw class="enabled">
+
+<!-- VLibras: tradução do conteúdo para Libras. Carrega de vlibras.gov.br; quando a
+     página é aberta sem internet o script simplesmente não carrega e o resto do
+     painel continua funcionando. -->
+<div vw class="enabled">
   <div vw-access-button class="active"></div>
   <div vw-plugin-wrapper>
     <div class="vw-plugin-top-wrapper"></div>
@@ -1545,4 +1552,5 @@ setTimeout(()=>mapa.invalidateSize(),400);
 <script>
   try { new window.VLibras.Widget('https://vlibras.gov.br/app'); } catch (e) {}
 </script>
+</body>
 </html>

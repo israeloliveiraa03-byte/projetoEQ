@@ -742,11 +742,19 @@ def gera_pagina(registros, sem_geo, proprias, saida, fonte_escola, fonte_turma):
                         'profTotal': 'PROFISSIONAIS_TOTAL (derivado)'})
     campos_json = json.dumps(campos_inep, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
 
-    municipios = len({r['ibge'] for r in registros if r.get('ibge')})
-    ufs = len({r['uf'] for r in registros if r.get('uf')})
     anos = sorted({r['ano'] for r in registros if r.get('ano')})
     ano = anos[-1] if anos else '—'
-    quilombolas = sum(1 for r in registros if r.get('locDif') == 3)
+
+    # O cabeçalho mostra duas linhas com denominadores diferentes: a do recorte
+    # quilombola e a do universo de comparação. Contar municípios/UF sobre o
+    # universo e exibi-los na linha das quilombolas seria atribuir a elas uma
+    # abrangência que não é delas.
+    quilombolas_reg = [r for r in registros if r.get('locDif') == 3]
+    quilombolas = len(quilombolas_reg)
+    municipios = len({r['ibge'] for r in quilombolas_reg if r.get('ibge')})
+    ufs = len({r['uf'] for r in quilombolas_reg if r.get('uf')})
+    municipios_universo = len({r['ibge'] for r in registros if r.get('ibge')})
+    ufs_universo = len({r['uf'] for r in registros if r.get('uf')})
 
     if proprias:
         nota_geo = (f"Nesta base, {proprias} escola(s) têm coordenada própria e "
@@ -764,6 +772,8 @@ def gera_pagina(registros, sem_geo, proprias, saida, fonte_escola, fonte_turma):
         '__TOTAL_UNIVERSO__': f'{len(registros):,}'.replace(',', '.'),
         '__TOTAL_MUNICIPIOS__': f'{municipios:,}'.replace(',', '.'),
         '__TOTAL_UFS__': str(ufs),
+        '__MUNICIPIOS_UNIVERSO__': f'{municipios_universo:,}'.replace(',', '.'),
+        '__UFS_UNIVERSO__': str(ufs_universo),
         '__ANO_CENSO__': str(ano),
         '__NOTA_GEO__': nota_geo,
         '__DATA_GERACAO__': hoje_br(),
