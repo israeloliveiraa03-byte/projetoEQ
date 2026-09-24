@@ -79,6 +79,7 @@
     .tabela-popup td{padding:2px 10px 2px 0;border:none}
     .tabela-popup td:first-child{color:var(--medio)}
     .popup-etapas{margin-top:8px;font-size:12px}
+    .popup-local{font-size:11.5px;color:var(--dourado);font-weight:600;letter-spacing:.02em;margin-top:2px}
     .grafico-wrapper{position:relative;height:340px;padding:20px 0}
     .mini-grafico{position:relative;height:240px}
     .stacked-wrapper{position:relative;height:220px}
@@ -239,7 +240,7 @@
             <div class="campo"><label for="filterLoc">Localização</label><select id="filterLoc"><option value="">Todas</option></select></div>
             <div class="campo"><label for="filterSit">Situação</label><select id="filterSit"><option value="">Todas</option></select></div>
             <div class="campo"><label for="filterEtapa">Oferece etapa</label><select id="filterEtapa"><option value="">Qualquer</option></select></div>
-            <div class="campo"><label for="filterBusca">Busca</label><input type="text" id="filterBusca" placeholder="Nome da escola ou município"></div>
+            <div class="campo"><label for="filterBusca">Busca</label><input type="text" id="filterBusca" placeholder="Escola, comunidade ou município"></div>
             <div class="campo"><label>&nbsp;</label><button class="btn-limpar" id="btnLimpar">Limpar filtros</button></div>
         </div>
     </div>
@@ -579,7 +580,7 @@
                 </ul>
                 <div class="caixa-aviso">
                     <strong>Limitações conhecidas</strong>
-                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais — por isso alguns “n” variam entre indicadores. <strong>Nem toda escola declara coordenada</strong>, e a cobertura varia bastante entre os territórios; as que não declaram entram no mapa agrupadas por município. Endereço, CEP e telefone existem na base de origem, mas não são republicados aqui. O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola, e há comunidades sem escola alguma — estas, por definição, não aparecem aqui. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
+                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais — por isso alguns “n” variam entre indicadores. <strong>Nem toda escola declara coordenada</strong>, e a cobertura varia bastante entre os territórios; as que não declaram entram no mapa agrupadas por município. A <strong>localidade</strong> mostrada nos pontos do mapa e na tabela é o campo de endereço do Censo. Em escola quilombola rural ele quase nunca é endereço postal: em 54% dos casos nomeia a comunidade ou o povoado, em 23% um lugar (rio, lago, igarapé, ramal) e em 15% uma rua ou rodovia — só 4% trazem número. É a única pista de território que o Censo oferece abaixo do município, e por isso vale lida como indicação, não como endereço. Número, complemento, bairro, CEP e telefone existem na base de origem e não são republicados. O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola, e há comunidades sem escola alguma — estas, por definição, não aparecem aqui. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
                 </div>
             </div>
             <div class="cartao-fonte">
@@ -773,7 +774,7 @@ function aplicaFiltros(){
     if (filtros.loc && String(r.loc) !== filtros.loc) return false;
     if (filtros.sit && String(r.sit) !== filtros.sit) return false;
     if (filtros.etapa && !ofertaDe(r, filtros.etapa)) return false;
-    if (b && !((r.escola||'')+' '+(r.municipio||'')+' '+(r.uf||'')).toLowerCase().includes(b)) return false;
+    if (b && !((r.escola||'')+' '+(r.localidade||'')+' '+(r.municipio||'')+' '+(r.uf||'')).toLowerCase().includes(b)) return false;
     return true;
   });
 }
@@ -845,6 +846,7 @@ function popupEscola(r){
   ].filter(l=>l[1]).map(l=>`<tr><td>${l[0]}</td><td><strong>${l[1]}</strong></td></tr>`).join('');
   const etapas = etapasOfertadas(r).join(', ');
   return `<strong>${esc(r.escola)}</strong><br>${esc(r.municipio)} (${esc(r.uf)})` +
+    (r.localidade ? `<div class="popup-local">${esc(r.localidade)}</div>` : '') +
     `<table class="tabela-popup">${linhas}</table>` +
     (etapas?`<div class="popup-etapas"><b>Oferta:</b> ${etapas}</div>`:'') +
     (r.fonteGeo==='municipio'?'<div class="popup-etapas" style="color:#A85630;">Posição aproximada: centróide do município.</div>':'') +
@@ -866,7 +868,8 @@ function popupMunicipio(grupo){
     ['Com internet', `${fmt(grupo.filter(r=>r.internet===1).length)} de ${fmt(grupo.filter(r=>r.internet===0||r.internet===1).length)} com dado`],
   ].map(l=>`<tr><td>${l[0]}</td><td><strong>${l[1]}</strong></td></tr>`).join('');
   const tipos = Object.entries(porTipo).map(([t,n])=>`${esc(t)}: ${fmt(n)}`).join(' · ');
-  const nomes = grupo.slice(0,8).map(r=>`<div style="margin-top:3px">• ${esc(r.escola)}</div>`).join('');
+  const nomes = grupo.slice(0,8).map(r=>`<div style="margin-top:4px">• ${esc(r.escola)}` +
+    (r.localidade ? `<div class="popup-local" style="margin-left:9px">${esc(r.localidade)}</div>` : '') + `</div>`).join('');
   return `<strong>${esc(r0.municipio)} (${esc(r0.uf)})</strong>` +
     `<table class="tabela-popup">${linhas}</table>` +
     `<div class="popup-etapas">${tipos}</div>` +
@@ -888,7 +891,7 @@ function renderPontos(){
   proprias.forEach(r=>{
     const m = L.circleMarker([r.lat,r.lon],{radius:5.5,weight:1,color:'#FBF6EA',
       fillColor:corPonto(r),fillOpacity:.85});
-    m.bindTooltip(esc(r.escola), {className:'ponto-tooltip'});
+    m.bindTooltip(esc(r.escola) + (r.localidade ? ` · ${esc(r.localidade)}` : ''), {className:'ponto-tooltip'});
     m.bindPopup(()=>popupEscola(r), {maxWidth:320});
     camadaPontos.addLayer(m);
   });
@@ -1022,7 +1025,7 @@ function baseComparacao(){
     if (filtros.loc && String(r.loc) !== filtros.loc) return false;
     if (filtros.sit && String(r.sit) !== filtros.sit) return false;
     if (filtros.etapa && !ofertaDe(r, filtros.etapa)) return false;
-    if (b && !((r.escola||'')+' '+(r.municipio||'')+' '+(r.uf||'')).toLowerCase().includes(b)) return false;
+    if (b && !((r.escola||'')+' '+(r.localidade||'')+' '+(r.municipio||'')+' '+(r.uf||'')).toLowerCase().includes(b)) return false;
     return true;
   });
 }
@@ -1321,7 +1324,9 @@ function renderTabela(){
   if (pagina>paginas) pagina=paginas;
   const ini=(pagina-1)*porPagina, corte=lista.slice(ini,ini+porPagina);
   $('tabelaCorpo').innerHTML = corte.length ? corte.map(r=>`<tr>
-      <td><strong>${esc(r.escola)}</strong><br><span class="celula-vazia">cód. ${esc(r.cod||'—')}</span></td>
+      <td><strong>${esc(r.escola)}</strong>` +
+      (r.localidade ? `<br><span style="color:var(--dourado);font-size:12px">${esc(r.localidade)}</span>` : '') +
+      `<br><span class="celula-vazia">cód. ${esc(r.cod||'—')}</span></td>
       <td><span class="chip-etapa" style="border-color:${CORES_TIPO[r.locDif]||'#D9CBAC'}">${esc(TIPOS_CURTO[r.locDif]||'—')}</span></td>
       <td>${esc(r.municipio||'—')}</td><td>${esc(r.uf||'—')}</td>
       <td>${DEPS[r.dep]||'—'}</td><td>${LOCS[r.loc]||'—'}</td><td>${SITS[r.sit]||'—'}</td>
@@ -1457,12 +1462,12 @@ function baixaArquivo(nome, conteudo, tipo){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 function exportaCSV(dados,nome){
-  const cab=['Escola','Código INEP','Tipo de território','Município','UF','Região','Dependência','Localização','Situação',
+  const cab=['Escola','Código INEP','Localidade (endereço declarado)','Tipo de território','Município','UF','Região','Dependência','Localização','Situação',
             'Internet','Água potável','Energia (rede)','Esgoto (rede)','Salas utilizadas',
             'Turmas (total)','Turmas de EJA','Turmas de EJA – fundamental','Turmas de EJA – médio','Turmas de EJA – noturno',
             'Etapas ofertadas','Turma multisseriada','Latitude','Longitude','Origem da coordenada'];
   const coord = v => v==null ? '' : String(v).replace('.',',');
-  const linhas=dados.map(r=>[r.escola,r.cod,TIPOS[r.locDif],r.municipio,r.uf,r.regiao,DEPS[r.dep],LOCS[r.loc],SITS[r.sit],
+  const linhas=dados.map(r=>[r.escola,r.cod,r.localidade,TIPOS[r.locDif],r.municipio,r.uf,r.regiao,DEPS[r.dep],LOCS[r.loc],SITS[r.sit],
     sntxt(r.internet),sntxt(r.aguaPotavel),sntxt(r.energiaRede),sntxt(r.esgotoRede),r.salas??'',
     r.turTotal??'',r.turEja??'',r.turEjaFund??'',r.turEjaMed??'',r.turEjaNoturno??'',
     etapasOfertadas(r).join('; '), r.multisseriada==null?'':(r.multisseriada===1?'Sim':'Não'),

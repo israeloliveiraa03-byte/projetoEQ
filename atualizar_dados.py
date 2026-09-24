@@ -93,6 +93,12 @@ CAMPOS_ESCOLA = {
     'NU_ANO_CENSO': 'ano', 'NO_REGIAO': 'regiao', 'NO_UF': 'ufNome', 'SG_UF': 'uf',
     'NO_MUNICIPIO': 'municipio', 'CO_MUNICIPIO': 'ibge',
     'NO_ENTIDADE': 'escola', 'CO_ENTIDADE': 'cod',
+    # Em escola quilombola rural o "endereço" quase nunca é endereço postal: é o nome
+    # da comunidade, do povoado, do rio ou do ramal onde ela fica. Só 3,9% trazem
+    # número de casa. É a única pista de território que o Censo dá abaixo do município,
+    # por isso entra no painel — rotulada como "localidade", não como "comunidade",
+    # porque em 15% dos casos é mesmo uma rua ou rodovia.
+    'DS_ENDERECO': 'localidade',
     'TP_DEPENDENCIA': 'dep', 'TP_LOCALIZACAO': 'loc',
     'TP_LOCALIZACAO_DIFERENCIADA': 'locDif', 'TP_SITUACAO_FUNCIONAMENTO': 'sit',
     # Coordenadas: existem na versão completa da tabela de Escola (colunas AH e AI) e
@@ -187,7 +193,8 @@ CAMPOS_TURMA = {
     'QT_TUR_EJA_INT': 'turEjaIntegral',
 }
 
-TEXTO = {'ano', 'regiao', 'ufNome', 'uf', 'municipio', 'ibge', 'escola', 'cod', 'latTxt', 'lonTxt'}
+TEXTO = {'ano', 'regiao', 'ufNome', 'uf', 'municipio', 'ibge', 'escola', 'cod', 'localidade',
+         'latTxt', 'lonTxt'}
 
 PROFS = ['profAdministrativo', 'profServicos', 'profBibliotecario', 'profSaude',
          'profCoordenador', 'profFonoaudiologo', 'profNutricionista', 'profPsicologo',
@@ -206,11 +213,11 @@ ACC_BRUTOS = ('accCorrimao', 'accElevador', 'accPisosTateis', 'accVaoLivre',
 # latTxt/lonTxt saem porque o que interessa é o lat/lon já tratado.
 OCULTOS = ('ufNome', 'latTxt', 'lonTxt') + ACC_BRUTOS
 
-# A versão completa da tabela de Escola traz endereço, CEP e telefone das escolas.
-# O painel é uma página pública, e este projeto optou por não republicar esses
-# campos; por isso eles nem chegam a ser lidos. Para incluí-los (por exemplo, num
-# painel interno do coletivo), acrescente-os a CAMPOS_ESCOLA.
-NAO_LIDOS = ('DS_ENDERECO', 'NU_ENDERECO', 'DS_COMPLEMENTO', 'NO_BAIRRO',
+# A versão completa da tabela de Escola traz também número, complemento, bairro,
+# CEP e telefone. Esses não são republicados — não acrescentam nada à leitura
+# territorial e o painel é uma página pública. Para incluí-los (num painel interno
+# do coletivo, por exemplo), acrescente-os a CAMPOS_ESCOLA.
+NAO_LIDOS = ('NU_ENDERECO', 'DS_COMPLEMENTO', 'NO_BAIRRO',
              'CO_CEP', 'NU_DDD', 'NU_TELEFONE')
 
 # Colunas que podem faltar sem que isso seja um problema: a versão anonimizada
