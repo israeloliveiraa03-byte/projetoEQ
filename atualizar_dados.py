@@ -794,7 +794,7 @@ def monta_colunar(registros):
     return {'n': len(registros), 'campos': campos, 'tipos': tipos, 'colunas': colunas}
 
 
-def gera_pagina(registros, sem_geo, proprias, saida, fonte_escola, fonte_turma):
+def gera_pagina(registros, sem_geo, proprias, saida, fontes):
     with open(TEMPLATE_PATH, encoding='utf-8') as f:
         tpl = f.read()
 
@@ -840,7 +840,13 @@ def gera_pagina(registros, sem_geo, proprias, saida, fonte_escola, fonte_turma):
     if sem_geo:
         nota_geo += f" {sem_geo} escola(s) ficaram sem localização e não aparecem no mapa."
 
-    arquivos = os.path.basename(fonte_escola) + (f" e {os.path.basename(fonte_turma)}" if fonte_turma else "")
+    # "A e B" com dois arquivos, "A, B e C" com três — a frase cita as fontes de fato
+    # usadas, então precisa acompanhar quais o usuário passou.
+    nomes = [os.path.basename(f) for f in fontes if f]
+    if len(nomes) == 1:
+        arquivos = f"do arquivo {nomes[0]}, baixado"
+    else:
+        arquivos = "dos arquivos " + ", ".join(nomes[:-1]) + f" e {nomes[-1]}, baixados"
 
     subs = {
         '__TOTAL_ESCOLAS__': f'{quilombolas:,}'.replace(',', '.'),
@@ -917,7 +923,8 @@ def main():
             for c in OCULTOS:
                 r.pop(c, None)
 
-        gera_pagina(registros, sem_geo, proprias, args.saida, args.escola, args.turma)
+        gera_pagina(registros, sem_geo, proprias, args.saida,
+                    [args.escola, args.turma, args.matricula, args.coordenadas])
     except (RuntimeError, OSError) as e:
         print(f"\nERRO: {e}")
         sys.exit(1)
