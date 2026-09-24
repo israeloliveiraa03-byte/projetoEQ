@@ -139,6 +139,8 @@
     footer.site-footer strong{color:#fff;font-weight:600;display:block;margin-bottom:8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
     footer.site-footer p{margin-bottom:6px}
     footer.site-footer .assinatura{border-top:1px solid rgba(255,255,255,.15);margin-top:30px;padding-top:20px;grid-column:1/-1;font-size:12px;color:rgba(255,255,255,.5)}
+    footer.site-footer a{color:rgba(255,255,255,.85);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.35)}
+    footer.site-footer a:hover{color:#fff;border-color:var(--dourado)}
     @media(max-width:900px){.fontes-grid,.duas-colunas,.analise-grid{grid-template-columns:1fr}}
     @media(max-width:768px){
         .container{padding:0 20px}
@@ -193,7 +195,7 @@
             </div>
         </div>
         <div class="header-meta">
-            <span><strong>Página gerada em:</strong> 23/09/2026</span>
+            <span><strong>Página gerada em:</strong> 24/09/2026</span>
             <span><strong>Fonte:</strong> microdados do Censo Escolar 2025 — INEP</span>
             <span><strong>Escolas quilombolas:</strong> 2.737 · 1.732 municípios · 27 UF</span>
             <span><strong>Base para comparação:</strong> 12.472 escolas em território diferenciado</span>
@@ -565,7 +567,7 @@
         <div class="fontes-grid">
             <div class="fontes-texto">
                 <p><strong>De onde vêm os dados.</strong> Os microdados do Censo Escolar da Educação Básica (2025) são produzidos pelo INEP e são públicos. Este painel cruza duas tabelas do Censo pelo código da escola: a tabela <em>Escola</em>, de onde vêm infraestrutura, dependência e localização, e a tabela <em>Turma</em>, de onde vêm as turmas efetivamente abertas — inclusive as de EJA. O recorte é o de localização diferenciada (TP_LOCALIZACAO_DIFERENCIADA), categoria declarada pela própria escola: além da comunidade quilombola (código 3), o painel carrega terra indígena, área de assentamento e demais povos e comunidades tradicionais, para permitir a comparação.</p>
-                <p><strong>Como esta página foi feita.</strong> Ela foi gerada a partir dos arquivos <em>Tabela_Escola_2025.csv e Tabela_Turma_2025_V2.csv</em>, baixados da página de microdados do INEP, em 23/09/2026. Não há atualização automática nem banco de dados: quem mantém o painel baixa os microdados do ano, roda o script de geração e publica o arquivo que sai. O Censo é anual, então a base muda uma vez por ano.</p>
+                <p><strong>Como esta página foi feita.</strong> Ela foi gerada a partir dos arquivos <em>Tabela_Escola_2025.csv e Tabela_Turma_2025_V2.csv</em>, baixados da página de microdados do INEP, em 24/09/2026. Não há atualização automática nem banco de dados: quem mantém o painel baixa os microdados do ano, roda o script de geração e publica o arquivo que sai. O Censo é anual, então a base muda uma vez por ano.</p>
                 <ul>
                     <li>Consulte os microdados oficiais do Censo Escolar na página do INEP, ao lado.</li>
                     <li>Baixe os dados desta página em CSV ou JSON — a seleção filtrada ou a base completa com os nomes de coluna do INEP.</li>
@@ -579,7 +581,7 @@
             <div class="cartao-fonte">
                 <h3>Baixar e conferir</h3>
                 <a class="link-fonte" href="https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-escolar" target="_blank" rel="noopener">↗ Microdados do Censo Escolar — INEP</a>
-                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-indicadores/censo-escolar" target="_blank" rel="noopener">↗ Censo Escolar — página oficial</a>
+                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-educacionais/censo-escolar" target="_blank" rel="noopener">↗ Censo Escolar — página oficial</a>
                 <div class="separador"></div>
                 <p style="font-size:13px;margin-bottom:12px;">Os botões abaixo baixam a base inteira carregada nesta página, com os nomes de coluna do INEP. Para a seleção filtrada, use os botões na seção <a href="#tabela" style="color:var(--verde)">Relação das escolas</a>.</p>
                 <div class="lista-download">
@@ -607,7 +609,7 @@
             <strong>Dados</strong>
             <p>Microdados do Censo Escolar da Educação Básica (INEP) — recorte de escolas em comunidades quilombolas.</p>
         </div>
-        <div class="assinatura">Painel adaptado do projeto Raizame Dados · Gerado a partir dos microdados do Censo Escolar 2025 (INEP) em 23/09/2026 · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
+        <div class="assinatura">Painel adaptado do <a href="https://raizamedados.vercel.app/" target="_blank" rel="noopener">Raizame Dados — Comunidades Quilombolas Certificadas (base FCP)</a> · Gerado a partir dos microdados do Censo Escolar 2025 (INEP) em 24/09/2026 · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
     </div>
 </footer>
 
