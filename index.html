@@ -200,7 +200,7 @@
             </div>
         </div>
         <div class="header-meta">
-            <span><strong>Página gerada em:</strong> 24/09/2026</span>
+            <span><strong>Página gerada em:</strong> 25/09/2026</span>
             <span><strong>Fonte:</strong> microdados do Censo Escolar 2025 — INEP</span>
             <span><strong>Escolas quilombolas:</strong> 2.737 · 699 municípios · 24 UF</span>
             <span><strong>Base para comparação:</strong> 12.472 escolas em território diferenciado · 1.732 municípios · 27 UF</span>
@@ -215,7 +215,7 @@
             <div>
                 <div class="rotulo">Panorama geral</div>
                 <h2>Síntese dos indicadores</h2>
-                <p class="descricao">Números consolidados para o recorte selecionado abaixo. Os percentuais são calculados sobre as escolas com informação no Censo (códigos 0 ou 1); escolas sem dado entram apenas na contagem total.</p>
+                <p class="descricao">Números consolidados para o recorte selecionado abaixo. Cada percentual é calculado só entre as escolas que responderam àquela pergunta no Censo — a linha abaixo de cada número mostra quantas têm o item e quantas responderam. Escolas sem declaração entram na contagem total de escolas, mas não no percentual.</p>
             </div>
         </div>
         <div class="indicadores-grid" id="indicadores"></div>
@@ -302,7 +302,7 @@
             <div>
                 <div class="rotulo">Condições de funcionamento</div>
                 <h2>Infraestrutura básica das escolas</h2>
-                <p class="descricao">Percentual de escolas do recorte com cada serviço ou dependência, entre as que declararam informação no Censo. Barras em terracota indicam indicadores abaixo de 50%.</p>
+                <p class="descricao">De cada 100 escolas do recorte <strong>que responderam</strong> sobre o item, quantas o têm. Escolas que não declararam ficam fora da conta, e por isso o denominador muda de indicador para indicador — passe o mouse na barra para ver quantas são. Barras em terracota indicam indicadores abaixo de 50%.</p>
             </div>
         </div>
         <div class="grafico-wrapper" style="height:520px;"><canvas id="graficoInfra" role="img" aria-label="Barras: percentual de escolas com cada item de infraestrutura"></canvas></div>
@@ -600,7 +600,7 @@
         <div class="fontes-grid">
             <div class="fontes-texto">
                 <p><strong>De onde vêm os dados.</strong> Os microdados do Censo Escolar da Educação Básica (2025) são produzidos pelo INEP e são públicos. Este painel cruza três tabelas do Censo pelo código da escola: a tabela <em>Escola</em>, de onde vêm infraestrutura, dependência e localização; a tabela <em>Turma</em>, de onde vêm as turmas efetivamente abertas, inclusive as de EJA; e a tabela <em>Matrícula</em>, de onde vêm os alunos — cor/raça, sexo, turno, faixa etária e transporte escolar. As três dizem coisas diferentes: a primeira, que a modalidade existe; a segunda, quantas turmas; a terceira, quantos alunos. O recorte é o de localização diferenciada (TP_LOCALIZACAO_DIFERENCIADA), categoria declarada pela própria escola: além da comunidade quilombola (código 3), o painel carrega terra indígena, área de assentamento e demais povos e comunidades tradicionais, para permitir a comparação.</p>
-                <p><strong>Como esta página foi feita.</strong> Ela foi gerada a partir dos arquivos Tabela_Escola_2025.csv, Tabela_Turma_2025_V2.csv e Tabela_Matricula_2025_V2.csv, baixados da página de microdados do INEP, em 24/09/2026. Não há atualização automática nem banco de dados: quem mantém o painel baixa os microdados do ano, roda o script de geração e publica o arquivo que sai. O Censo é anual, então a base muda uma vez por ano.</p>
+                <p><strong>Como esta página foi feita.</strong> Ela foi gerada a partir dos arquivos Tabela_Escola_2025.csv, Tabela_Turma_2025_V2.csv e Tabela_Matricula_2025_V2.csv, baixados da página de microdados do INEP, em 25/09/2026. Não há atualização automática nem banco de dados: quem mantém o painel baixa os microdados do ano, roda o script de geração e publica o arquivo que sai. O Censo é anual, então a base muda uma vez por ano.</p>
                 <ul>
                     <li>Consulte os microdados oficiais do Censo Escolar na página do INEP, ao lado.</li>
                     <li>Baixe os dados desta página em CSV ou JSON — a seleção filtrada ou a base completa com os nomes de coluna do INEP.</li>
@@ -642,7 +642,7 @@
             <strong>Dados</strong>
             <p>Microdados do Censo Escolar da Educação Básica (INEP) — recorte de escolas em comunidades quilombolas.</p>
         </div>
-        <div class="assinatura">Painel adaptado do <a href="https://raizamedados.vercel.app/" target="_blank" rel="noopener">Raizame Dados — Comunidades Quilombolas Certificadas (base FCP)</a> · Gerado a partir dos microdados do Censo Escolar 2025 (INEP) em 24/09/2026 · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
+        <div class="assinatura">Painel adaptado do <a href="https://raizamedados.vercel.app/" target="_blank" rel="noopener">Raizame Dados — Comunidades Quilombolas Certificadas (base FCP)</a> · Gerado a partir dos microdados do Censo Escolar 2025 (INEP) em 25/09/2026 · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
     </div>
 </footer>
 
@@ -850,7 +850,12 @@ function pct(campo, arr){
   return {p: n ? 100*sim/n : null, sim, n};
 }
 const pctTxt = p => p.p==null ? '—' : p.p.toFixed(1).replace('.',',')+'%';
-const notaN = p => `n = ${fmt(p.n)} escolas com dado`;
+/* A nota fica logo abaixo do rótulo ("Com material pedagógico quilombola"), então
+   escrever só "n = 2.737 escolas com dado" convida a leitura errada — parece dizer
+   que 2.737 escolas TÊM o material. Mostrar a fração desfaz a ambiguidade e ainda
+   informa o numerador, que estava escondido no percentual. */
+const notaN = p => p.n ? `${fmt(p.sim)} de ${fmt(p.n)} escolas que informaram`
+                       : 'nenhuma escola informou este item';
 const contaMunicipios = () => new Set(visiveis.filter(r=>r.ibge).map(r=>r.ibge)).size;
 const contaUF = () => new Set(visiveis.filter(r=>r.uf).map(r=>r.uf)).size;
 
@@ -1028,7 +1033,7 @@ function renderInfra(){
       backgroundColor:res.map(x=>x.p==null?'#8A7C68':(x.p<50?'#A85630':'#3B5D42'))}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const x=res[ctx.dataIndex];
-        return [` ${x.p==null?'sem dado':x.p.toFixed(1).replace('.',',')+'%'} das escolas com dado`,` ${fmt(x.sim)} de ${fmt(x.n)} escolas`];}}}},
+        return [` ${x.p==null?'sem dado':x.p.toFixed(1).replace('.',',')+'%'} das escolas que informaram`,` ${fmt(x.sim)} têm, de ${fmt(x.n)} que informaram`];}}}},
       scales:{x:{max:100,ticks:{callback:v=>v+'%'}}}}});
 }
 function renderDonut(id, pares){
