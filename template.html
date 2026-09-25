@@ -10,29 +10,31 @@
 <meta property="og:title" content="Escolas Quilombolas em Dados · CONAQ">
 <meta property="og:description" content="Mapa, indicadores e cruzamento de variáveis sobre as escolas em comunidades quilombolas (Censo Escolar/INEP).">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%233B5D42'/%3E%3Cpath d='M12 21C12 21 4 17.2 4 9.3C4 5.1 7.3 2 12 2C16.7 2 20 5.1 20 9.3C20 17.2 12 21 12 21Z' fill='%23fff'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
-    :root{--verde:#3B5D42;--verde-escuro:#24382A;--dourado:#B9812F;--terracota:#A85630;--grafite:#2E271F;--texto:#4A4033;--medio:#6E624F;--claro:#E4DAC6;--fundo:#F4EEDF;--branco:#FFF;--creme:#FBF6EA;--borda:#D9CBAC;--alerta-bg:#FBF0DC;--alerta-borda:#DCAE5C}
+    :root{--verde:#3B5D42;--verde-escuro:#24382A;--dourado:#B9812F;--terracota:#A85630;--grafite:#2E271F;--texto:#4A4033;--medio:#6E624F;--claro:#E4DAC6;--fundo:#F4EEDF;--branco:#FFF;--creme:#FBF6EA;--borda:#D9CBAC;--alerta-bg:#FBF0DC;--alerta-borda:#DCAE5C;
+      /* Times em toda a página. A lista é uma cadeia de fallback: cada nome é
+         tentado na ordem. Times New Roman existe no Windows e no macOS; Liberation
+         Serif, Tinos e Nimbus Roman são as métricas equivalentes no Linux e no
+         Android. 'serif' no fim garante um serifado qualquer se nada mais houver. */
+      --fonte:'Times New Roman',Times,'Liberation Serif','Tinos','Nimbus Roman',serif}
     *{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
-    body{font-family:'Inter',-apple-system,sans-serif;background:var(--creme);color:var(--texto);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+    body{font-family:var(--fonte);background:var(--creme);color:var(--texto);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
     .container{max-width:1280px;margin:0 auto;padding:0 32px}
-    .top-bar{background:var(--verde-escuro);color:rgba(255,255,255,.85);font-size:12px;letter-spacing:.04em;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+    .top-bar{background:var(--verde-escuro);color:rgba(255,255,255,.85);font-size:13px;letter-spacing:.04em;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1)}
     .top-bar .container{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
     .top-bar strong{color:#fff;font-weight:600}
     header.site-header{background:var(--branco);border-bottom:1px solid var(--claro);padding:40px 0 36px;position:relative;overflow:hidden}
     .header-marca{display:flex;align-items:flex-start;gap:24px;border-left:4px solid var(--dourado);padding-left:24px}
     .header-simbolo{width:56px;height:56px;background:var(--verde);display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .header-simbolo svg{width:34px;height:34px}
-    .header-titulos h1{font-family:'Source Serif 4',Georgia,serif;font-size:30px;font-weight:700;color:var(--verde-escuro);line-height:1.2;letter-spacing:-.01em}
-    .subtitulo-nome{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dourado);margin-top:4px}
-    .header-titulos .subtitulo{font-family:'Source Serif 4',Georgia,serif;font-size:16px;color:var(--medio);margin-top:8px;max-width:760px}
-    .header-meta{margin-top:20px;padding-top:20px;border-top:1px solid var(--claro);font-size:13px;color:var(--medio);display:flex;gap:32px;flex-wrap:wrap}
+    .header-titulos h1{font-family:var(--fonte);font-size:30px;font-weight:700;color:var(--verde-escuro);line-height:1.2;letter-spacing:-.01em}
+    .subtitulo-nome{font-size:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dourado);margin-top:4px}
+    .header-titulos .subtitulo{font-family:var(--fonte);font-size:16px;color:var(--medio);margin-top:8px;max-width:760px}
+    .header-meta{margin-top:20px;padding-top:20px;border-top:1px solid var(--claro);font-size:14px;color:var(--medio);display:flex;gap:32px;flex-wrap:wrap}
     .header-meta strong{color:var(--grafite);font-weight:600}
     .motivo-raiz{position:absolute;inset:0;pointer-events:none;opacity:.08;z-index:0}
     .motivo-raiz svg{width:100%;height:100%}
@@ -41,44 +43,44 @@
     section.bloco::after{content:"";display:block;position:absolute;bottom:0;left:0;right:0;height:10px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10' preserveAspectRatio='none'%3E%3Cpath d='M0,4 C10,9 20,0 30,5 C40,10 50,1 60,5 C70,9 80,0 90,5 C100,10 110,2 120,5 L120,10 L0,10 Z' fill='%23D9CBAC'/%3E%3C/svg%3E");background-repeat:repeat-x;background-size:120px 10px;opacity:.7}
     section.bloco:last-of-type::after{display:none}
     .secao-cabecalho{margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px}
-    .secao-cabecalho .rotulo{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dourado);margin-bottom:8px}
-    .secao-cabecalho h2{font-family:'Source Serif 4',Georgia,serif;font-size:24px;font-weight:600;color:var(--verde-escuro)}
-    .secao-cabecalho p.descricao{margin-top:10px;font-size:14px;color:var(--medio);max-width:760px}
+    .secao-cabecalho .rotulo{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dourado);margin-bottom:8px}
+    .secao-cabecalho h2{font-family:var(--fonte);font-size:24px;font-weight:600;color:var(--verde-escuro)}
+    .secao-cabecalho p.descricao{margin-top:10px;font-size:15px;color:var(--medio);max-width:760px}
     .indicadores-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--claro);border:1px solid var(--claro)}
     .indicador{background:var(--branco);padding:26px 22px}
-    .indicador .valor{font-family:'Source Serif 4',Georgia,serif;font-size:32px;font-weight:700;color:var(--verde);line-height:1}
-    .indicador .rotulo{margin-top:10px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--medio)}
-    .indicador .nota{margin-top:6px;font-size:12px;color:var(--medio);font-style:italic}
+    .indicador .valor{font-family:var(--fonte);font-size:32px;font-weight:700;color:var(--verde);line-height:1}
+    .indicador .rotulo{margin-top:10px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--medio)}
+    .indicador .nota{margin-top:6px;font-size:13px;color:var(--medio);font-style:italic}
     .filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:20px;align-items:end;padding:24px;background:var(--fundo);border:1px solid var(--claro)}
     .campo{display:flex;flex-direction:column}
-    .campo label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--medio);margin-bottom:8px}
-    .campo select,.campo input{font-family:'Inter',sans-serif;font-size:14px;padding:10px 12px;border:1px solid var(--borda);background:var(--branco);color:var(--grafite);border-radius:0;outline:none}
+    .campo label{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--medio);margin-bottom:8px}
+    .campo select,.campo input{font-family:var(--fonte);font-size:15px;padding:10px 12px;border:1px solid var(--borda);background:var(--branco);color:var(--grafite);border-radius:0;outline:none}
     .campo select:focus,.campo input:focus{border-color:var(--verde)}
-    .btn-primario,.btn-limpar{font-family:'Inter',sans-serif;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:11px 20px;cursor:pointer;border:1px solid var(--verde)}
+    .btn-primario,.btn-limpar{font-family:var(--fonte);font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:11px 20px;cursor:pointer;border:1px solid var(--verde)}
     .btn-limpar{background:transparent;color:var(--verde)}
     .btn-limpar:hover{background:var(--verde);color:#fff}
     .btn-primario{background:var(--verde);color:#fff}
     .btn-primario:hover{background:var(--verde-escuro)}
     .barra-acoes{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
     .bloco-filtros{background:var(--fundo);border-top:1px solid var(--claro);border-bottom:1px solid var(--claro)}
-    .faixa-recorte{position:sticky;top:0;z-index:50;background:var(--verde-escuro);color:rgba(255,255,255,.92);font-size:12px;letter-spacing:.03em;text-align:center;padding:8px 16px}
+    .faixa-recorte{position:sticky;top:0;z-index:50;background:var(--verde-escuro);color:rgba(255,255,255,.92);font-size:13px;letter-spacing:.03em;text-align:center;padding:8px 16px}
     .camadas-painel{display:flex;gap:20px;align-items:end;flex-wrap:wrap;margin-bottom:16px;padding:16px;background:var(--fundo);border:1px solid var(--claro)}
     .mapa-wrapper{position:relative;z-index:0;height:560px;border:1px solid var(--claro);background:var(--fundo)}
     #mapa{height:100%;width:100%}
-    .mapa-dica{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:400;background:rgba(36,56,42,.88);color:#fff;font-size:11px;padding:6px 12px;border-radius:2px;pointer-events:none;transition:opacity .4s;white-space:nowrap}
-    .mapa-legenda{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--medio)}
+    .mapa-dica{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:400;background:rgba(36,56,42,.88);color:#fff;font-size:12px;padding:6px 12px;border-radius:2px;pointer-events:none;transition:opacity .4s;white-space:nowrap}
+    .mapa-legenda{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:var(--medio)}
     .mapa-legenda .item{display:flex;align-items:center;gap:6px}
     .mapa-legenda .bolinha{width:12px;height:12px;border-radius:50%;display:inline-block}
     .leaflet-popup-content-wrapper{border-radius:2px;box-shadow:0 2px 10px rgba(36,56,42,.25)}
-    .leaflet-popup-content{font-family:'Inter',sans-serif;font-size:13px;margin:12px 14px;line-height:1.5;min-width:230px}
-    .leaflet-popup-content strong{color:var(--verde-escuro);font-family:'Source Serif 4',Georgia,serif;font-size:14px}
+    .leaflet-popup-content{font-family:var(--fonte);font-size:14px;margin:12px 14px;line-height:1.5;min-width:230px}
+    .leaflet-popup-content strong{color:var(--verde-escuro);font-family:var(--fonte);font-size:15px}
     .leaflet-popup-tip,.leaflet-popup-content-wrapper{background:var(--creme)}
-    .ponto-tooltip{background:var(--verde-escuro);color:#fff;border:none;font-family:'Inter',sans-serif;font-size:11px;padding:3px 8px;box-shadow:none}
+    .ponto-tooltip{background:var(--verde-escuro);color:#fff;border:none;font-family:var(--fonte);font-size:12px;padding:3px 8px;box-shadow:none}
     .ponto-tooltip::before{border-top-color:var(--verde-escuro)!important}
-    .tabela-popup{border-collapse:collapse;margin-top:8px;font-size:12px}
+    .tabela-popup{border-collapse:collapse;margin-top:8px;font-size:13px}
     .tabela-popup td{padding:2px 10px 2px 0;border:none}
     .tabela-popup td:first-child{color:var(--medio)}
-    .popup-etapas{margin-top:8px;font-size:12px}
+    .popup-etapas{margin-top:8px;font-size:13px}
     .popup-local{font-size:11.5px;color:var(--dourado);font-weight:600;letter-spacing:.02em;margin-top:2px}
     .grafico-wrapper{position:relative;height:340px;padding:20px 0}
     .mini-grafico{position:relative;height:240px}
@@ -86,11 +88,11 @@
     .duas-colunas{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}
     .analise-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:32px;align-items:start}
     .tabela-scroll{overflow-x:auto;border:1px solid var(--claro)}
-    table.tabela-dados{width:100%;border-collapse:collapse;font-size:13px;min-width:1100px}
+    table.tabela-dados{width:100%;border-collapse:collapse;font-size:14px;min-width:1100px}
     table.tabela-dados thead{background:var(--verde-escuro);color:#fff}
-    table.tabela-dados th{text-align:left;padding:14px 16px;font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,.08);cursor:pointer;user-select:none}
+    table.tabela-dados th{text-align:left;padding:14px 16px;font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,.08);cursor:pointer;user-select:none}
     table.tabela-dados th:last-child{border-right:none}
-    table.tabela-dados th .seta{opacity:.5;margin-left:4px;font-size:10px}
+    table.tabela-dados th .seta{opacity:.5;margin-left:4px;font-size:11px}
     table.tabela-dados td{padding:12px 16px;border-bottom:1px solid var(--claro);border-right:1px solid var(--claro);vertical-align:top}
     /* nomes de escola quilombola são longos ("ANEXO COLEGIO ESTADUAL ... COMUNIDADE
        QUILOMBOLA"): sem largura mínima a coluna quebra em dez linhas e a tabela vira
@@ -100,47 +102,47 @@
     table.tabela-dados td:last-child{border-right:none}
     table.tabela-dados tbody tr:nth-child(even){background:var(--fundo)}
     table.tabela-dados tbody tr:hover{background:#EEF2F0}
-    table.tabela-ranking{width:100%;border-collapse:collapse;font-size:13px}
-    table.tabela-ranking th{text-align:left;padding:10px 14px;background:var(--verde-escuro);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+    table.tabela-ranking{width:100%;border-collapse:collapse;font-size:14px}
+    table.tabela-ranking th{text-align:left;padding:10px 14px;background:var(--verde-escuro);color:#fff;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
     table.tabela-ranking td{padding:10px 14px;border-bottom:1px solid var(--claro)}
     table.tabela-ranking tbody tr:nth-child(even){background:var(--fundo)}
-    table.tabela-ranking td.num{font-family:'Source Serif 4',Georgia,serif;font-weight:700;color:var(--verde);font-size:15px}
+    table.tabela-ranking td.num{font-family:var(--fonte);font-weight:700;color:var(--verde);font-size:15px}
     .celula-vazia{color:var(--medio);font-style:italic}
     .ok{color:var(--verde);font-weight:700}
     .nok{color:var(--terracota);font-weight:700}
-    .chip-etapa{display:inline-block;font-size:10px;border:1px solid var(--borda);padding:1px 6px;margin:1px 2px 1px 0;background:var(--fundo);white-space:nowrap}
-    .paginacao{display:flex;justify-content:space-between;align-items:center;padding:18px 0;font-size:13px;color:var(--medio);flex-wrap:wrap;gap:12px}
+    .chip-etapa{display:inline-block;font-size:11px;border:1px solid var(--borda);padding:1px 6px;margin:1px 2px 1px 0;background:var(--fundo);white-space:nowrap}
+    .paginacao{display:flex;justify-content:space-between;align-items:center;padding:18px 0;font-size:14px;color:var(--medio);flex-wrap:wrap;gap:12px}
     .paginacao .controles{display:flex;gap:8px;align-items:center}
-    .paginacao button{font-size:12px;font-weight:600;text-transform:uppercase;padding:9px 18px;background:var(--branco);border:1px solid var(--borda);color:var(--grafite);cursor:pointer}
+    .paginacao button{font-size:13px;font-weight:600;text-transform:uppercase;padding:9px 18px;background:var(--branco);border:1px solid var(--borda);color:var(--grafite);cursor:pointer}
     .paginacao button:hover:not(:disabled){background:var(--verde);border-color:var(--verde);color:#fff}
     .paginacao button:disabled{opacity:.4;cursor:not-allowed}
     .btn-limpar:disabled{opacity:.45;cursor:not-allowed;background:transparent;color:var(--medio);border-color:var(--borda)}
-    .paginacao select{font-size:12px;padding:8px 10px;border:1px solid var(--borda)}
+    .paginacao select{font-size:13px;padding:8px 10px;border:1px solid var(--borda)}
     .estado-vazio{text-align:center;padding:48px 20px;color:var(--medio);font-style:italic}
-    .caixa-aviso{background:var(--alerta-bg);border:1px solid var(--alerta-borda);padding:18px 20px;font-size:13px;color:#5C4A1A;margin-top:14px}
-    .caixa-aviso strong{display:block;margin-bottom:6px;color:#4A3B14;text-transform:uppercase;font-size:11px;letter-spacing:.06em}
+    .caixa-aviso{background:var(--alerta-bg);border:1px solid var(--alerta-borda);padding:18px 20px;font-size:14px;color:#5C4A1A;margin-top:14px}
+    .caixa-aviso strong{display:block;margin-bottom:6px;color:#4A3B14;text-transform:uppercase;font-size:12px;letter-spacing:.06em}
     .fontes-grid{display:grid;grid-template-columns:2fr 1fr;gap:32px}
-    .fontes-texto p{margin-bottom:14px;font-size:14px}
-    .fontes-texto ul{margin:0 0 14px 20px;font-size:14px}
+    .fontes-texto p{margin-bottom:14px;font-size:15px}
+    .fontes-texto ul{margin:0 0 14px 20px;font-size:15px}
     .fontes-texto li{margin-bottom:6px}
     .cartao-fonte{border:1px solid var(--claro);padding:22px;background:var(--fundo)}
-    .cartao-fonte h3{font-family:'Source Serif 4',Georgia,serif;font-size:16px;color:var(--verde-escuro);margin-bottom:10px}
-    .cartao-fonte a.link-fonte{display:block;font-size:13px;color:var(--verde);font-weight:600;margin-bottom:14px;word-break:break-word;text-decoration:none;border-bottom:1px solid var(--verde);padding-bottom:2px}
+    .cartao-fonte h3{font-family:var(--fonte);font-size:16px;color:var(--verde-escuro);margin-bottom:10px}
+    .cartao-fonte a.link-fonte{display:block;font-size:14px;color:var(--verde);font-weight:600;margin-bottom:14px;word-break:break-word;text-decoration:none;border-bottom:1px solid var(--verde);padding-bottom:2px}
     .cartao-fonte a.link-fonte:hover{color:var(--dourado);border-color:var(--dourado)}
     .cartao-fonte .separador{border-top:1px solid var(--claro);margin:16px 0}
     .lista-download{display:flex;flex-direction:column;gap:10px}
-    .lista-download button{text-align:left;font-size:13px;font-weight:600;padding:10px 14px;border:1px solid var(--verde);background:var(--branco);color:var(--verde);cursor:pointer}
+    .lista-download button{text-align:left;font-size:14px;font-weight:600;padding:10px 14px;border:1px solid var(--verde);background:var(--branco);color:var(--verde);cursor:pointer}
     .lista-download button:hover{background:var(--verde);color:#fff}
     .construtor-caixa{border:1px solid var(--claro);background:var(--fundo);padding:24px}
     .construtor-controles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;align-items:end;margin-bottom:20px}
     .construtor-resultado{background:var(--branco);border:1px solid var(--claro);padding:20px}
     .construtor-grafico{position:relative;height:360px;margin-bottom:16px}
-    .nota-metodo{font-size:12px;color:var(--medio);font-style:italic;margin-top:10px}
-    footer.site-footer{background:var(--verde-escuro);color:rgba(255,255,255,.7);padding:44px 0 30px;font-size:13px;margin-top:20px}
+    .nota-metodo{font-size:13px;color:var(--medio);font-style:italic;margin-top:10px}
+    footer.site-footer{background:var(--verde-escuro);color:rgba(255,255,255,.7);padding:44px 0 30px;font-size:14px;margin-top:20px}
     footer.site-footer .container{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:28px}
-    footer.site-footer strong{color:#fff;font-weight:600;display:block;margin-bottom:8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+    footer.site-footer strong{color:#fff;font-weight:600;display:block;margin-bottom:8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase}
     footer.site-footer p{margin-bottom:6px}
-    footer.site-footer .assinatura{border-top:1px solid rgba(255,255,255,.15);margin-top:30px;padding-top:20px;grid-column:1/-1;font-size:12px;color:rgba(255,255,255,.5)}
+    footer.site-footer .assinatura{border-top:1px solid rgba(255,255,255,.15);margin-top:30px;padding-top:20px;grid-column:1/-1;font-size:13px;color:rgba(255,255,255,.5)}
     footer.site-footer a{color:rgba(255,255,255,.85);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.35)}
     footer.site-footer a:hover{color:#fff;border-color:var(--dourado)}
     @media(max-width:900px){.fontes-grid,.duas-colunas,.analise-grid{grid-template-columns:1fr}}
@@ -164,7 +166,7 @@
 <!-- FAIXA INSTITUCIONAL -->
 <div class="top-bar">
     <div class="container">
-        <span><strong>CONAQ</strong> · Coordenação Nacional de Articulação das Comunidades Negras Rurais Quilombolas — <strong>Coletivo de Educação</strong></span>
+        <span><strong>CONAQ</strong> · Coordenação Nacional de Articulação das Comunidades Negras Rurais Quilombolas · <strong>Coletivo de Educação</strong></span>
         <span>Painel construído sobre dados públicos do Censo Escolar (INEP)</span>
     </div>
 </div>
@@ -196,12 +198,12 @@
             <div class="header-titulos">
                 <h1>Escolas Quilombolas em Dados</h1>
                 <p class="subtitulo-nome">Observatório das escolas em comunidades quilombolas</p>
-                <p class="subtitulo">Um painel do Coletivo de Educação da CONAQ para monitorar as condições de funcionamento, a infraestrutura e a oferta de ensino — inclusive de EJA — das escolas localizadas em comunidades quilombolas, a partir dos microdados do Censo Escolar (INEP). Reúne mapa com camadas, indicadores, comparação com os demais territórios diferenciados, análise de correlação e uma ferramenta de cruzamento de variáveis — sem precisar lidar com planilha dinâmica.</p>
+                <p class="subtitulo">Um painel do Coletivo de Educação da CONAQ para monitorar as condições de funcionamento, a infraestrutura e a oferta de ensino das escolas localizadas em comunidades quilombolas, inclusive a de EJA, a partir dos microdados do Censo Escolar (INEP). Reúne mapa com camadas, indicadores, comparação com os demais territórios diferenciados, análise de correlação e uma ferramenta de cruzamento de variáveis, sem precisar lidar com planilha dinâmica.</p>
             </div>
         </div>
         <div class="header-meta">
             <span><strong>Página gerada em:</strong> __DATA_GERACAO__</span>
-            <span><strong>Fonte:</strong> microdados do Censo Escolar __ANO_CENSO__ — INEP</span>
+            <span><strong>Fonte:</strong> microdados do Censo Escolar __ANO_CENSO__ (INEP)</span>
             <span><strong>Escolas quilombolas:</strong> __TOTAL_ESCOLAS__ · __TOTAL_MUNICIPIOS__ municípios · __TOTAL_UFS__ UF</span>
             <span><strong>Base para comparação:</strong> __TOTAL_UNIVERSO__ escolas em território diferenciado · __MUNICIPIOS_UNIVERSO__ municípios · __UFS_UNIVERSO__ UF</span>
         </div>
@@ -215,7 +217,7 @@
             <div>
                 <div class="rotulo">Panorama geral</div>
                 <h2>Síntese dos indicadores</h2>
-                <p class="descricao">Números consolidados para o recorte selecionado abaixo. Cada percentual é calculado só entre as escolas que responderam àquela pergunta no Censo — a linha abaixo de cada número mostra quantas têm o item e quantas responderam. Escolas sem declaração entram na contagem total de escolas, mas não no percentual.</p>
+                <p class="descricao">Números consolidados para o recorte selecionado abaixo. Cada percentual é calculado só entre as escolas que responderam àquela pergunta no Censo. A linha abaixo de cada número mostra quantas têm o item e quantas responderam. Escolas sem declaração entram na contagem total de escolas, mas não no percentual.</p>
             </div>
         </div>
         <div class="indicadores-grid" id="indicadores"></div>
@@ -229,7 +231,7 @@
             <div>
                 <div class="rotulo">Comece por aqui</div>
                 <h2>Filtre o recorte que quer estudar</h2>
-                <p class="descricao">Os filtros valem para a página inteira: mapa, indicadores, gráficos, tabela e cruzamentos mudam juntos. O painel abre no recorte quilombola — troque o <strong>tipo de território</strong> para ver outro recorte, ou escolha “todos” para comparar. As seções de <a href="#comparacao">comparação</a> e <a href="#correlacao">correlação</a> mostram os quatro tipos lado a lado, independentemente deste filtro.</p>
+                <p class="descricao">Os filtros valem para a página inteira: mapa, indicadores, gráficos, tabela e cruzamentos mudam juntos. O painel abre no recorte quilombola. Troque o <strong>tipo de território</strong> para ver outro recorte, ou escolha “todos” para comparar. As seções de <a href="#comparacao">comparação</a> e <a href="#correlacao">correlação</a> mostram os quatro tipos lado a lado, independentemente deste filtro.</p>
             </div>
         </div>
         <div class="filtros">
@@ -254,7 +256,7 @@
             <div>
                 <div class="rotulo">Distribuição territorial</div>
                 <h2>Mapa das escolas quilombolas</h2>
-                <p class="descricao">Escolas que declararam coordenada ao Censo aparecem como <strong>pontos</strong>, na posição informada. As demais entram num <strong>círculo por município</strong>, tanto maior quanto mais escolas ele reúne — é a localização que existe para elas. Clique em qualquer símbolo para ver a ficha. Troque o fundo do mapa no seletor do canto superior direito (claro, ruas, satélite ou relevo) e use a camada temática para mudar a cor.</p>
+                <p class="descricao">Escolas que declararam coordenada ao Censo aparecem como <strong>pontos</strong>, na posição informada. As demais entram num <strong>círculo por município</strong>, tanto maior quanto mais escolas ele reúne, que é a localização que existe para elas. Clique em qualquer símbolo para ver a ficha. Troque o fundo do mapa no seletor do canto superior direito (claro, ruas, satélite ou relevo) e use a camada temática para mudar a cor.</p>
             </div>
         </div>
         <div class="camadas-painel">
@@ -290,7 +292,7 @@
         <div class="mapa-legenda" id="legendaMapa"></div>
         <div class="caixa-aviso" style="margin-top:16px;">
             <strong>Nota metodológica do mapa</strong>
-            __NOTA_GEO__ <span id="notaGeo"></span> A coordenada é declarada pela própria escola ao Censo e não é conferida em campo; use-a como indicação, não como levantamento fundiário. Um <strong>círculo</strong> fica no centróide do município, não no endereço de nenhuma escola: quanto maior, mais escolas ele reúne, e a posição dentro do município é arbitrária. Cada coordenada é validada contra o território da própria UF antes de entrar no mapa — o centróide do município não serve para isso, porque há municípios amazônicos maiores que países inteiros. Escolas sem localização não aparecem no mapa, mas continuam nos gráficos e na tabela.
+            __NOTA_GEO__ <span id="notaGeo"></span> A coordenada é declarada pela própria escola ao Censo e não é conferida em campo; use-a como indicação, não como levantamento fundiário. Um <strong>círculo</strong> fica no centróide do município, não no endereço de nenhuma escola: quanto maior, mais escolas ele reúne, e a posição dentro do município é arbitrária. Cada coordenada é validada contra o território da própria UF antes de entrar no mapa. O centróide do município não serve para isso, porque há municípios amazônicos maiores que países inteiros. Escolas sem localização não aparecem no mapa, mas continuam nos gráficos e na tabela.
         </div>
     </div>
 </section>
@@ -302,7 +304,7 @@
             <div>
                 <div class="rotulo">Condições de funcionamento</div>
                 <h2>Infraestrutura básica das escolas</h2>
-                <p class="descricao">De cada 100 escolas do recorte <strong>que responderam</strong> sobre o item, quantas o têm. Escolas que não declararam ficam fora da conta, e por isso o denominador muda de indicador para indicador — passe o mouse na barra para ver quantas são. Barras em terracota indicam indicadores abaixo de 50%.</p>
+                <p class="descricao">De cada 100 escolas do recorte <strong>que responderam</strong> sobre o item, quantas o têm. Escolas que não declararam ficam fora da conta, e por isso o denominador muda de indicador para indicador. Passe o mouse na barra para ver quantas são. Barras em terracota indicam indicadores abaixo de 50%.</p>
             </div>
         </div>
         <div class="grafico-wrapper" style="height:520px;"><canvas id="graficoInfra" role="img" aria-label="Barras: percentual de escolas com cada item de infraestrutura"></canvas></div>
@@ -316,7 +318,7 @@
             <div>
                 <div class="rotulo">Escola quilombola em perspectiva</div>
                 <h2>Comparação entre tipos de território</h2>
-                <p class="descricao">Todas as escolas em área de localização diferenciada, lado a lado: quilombola, terra indígena, assentamento e demais povos e comunidades tradicionais. Esta seção <strong>ignora o filtro de tipo</strong> — é ele que se quer comparar —, mas respeita os filtros de região, UF, dependência e busca.</p>
+                <p class="descricao">Todas as escolas em área de localização diferenciada, lado a lado: quilombola, terra indígena, assentamento e demais povos e comunidades tradicionais. Esta seção <strong>ignora o filtro de tipo</strong>, já que é ele que se quer comparar, mas respeita os filtros de região, UF, dependência e busca.</p>
             </div>
         </div>
         <div class="camadas-painel">
@@ -353,7 +355,7 @@
             <div>
                 <div class="rotulo">Educação de Jovens e Adultos</div>
                 <h2>Oferta de EJA nas escolas do recorte</h2>
-                <p class="descricao">Aqui a medida são as <strong>turmas efetivamente abertas</strong>, da tabela de Turma do Censo — e não apenas a declaração de que a escola oferece a modalidade. Uma escola pode declarar EJA e ter poucas turmas; o número de turmas mostra o tamanho real da oferta.</p>
+                <p class="descricao">Aqui a medida são as <strong>turmas efetivamente abertas</strong>, da tabela de Turma do Censo, e não apenas a declaração de que a escola oferece a modalidade. Uma escola pode declarar EJA e ter poucas turmas; o número de turmas mostra o tamanho real da oferta.</p>
             </div>
         </div>
         <div class="indicadores-grid" id="indicadoresEja"></div>
@@ -397,7 +399,7 @@
         </div>
         <div class="caixa-aviso" style="margin-top:16px;">
             <strong>Como ler a cor/raça</strong>
-            <span id="notaRaca"></span> A declaração é feita pelo aluno ou responsável no ato da matrícula, com as categorias do IBGE — o Censo Escolar não tem categoria "quilombola" para cor/raça. Por isso o que se vê aqui é como a população quilombola aparece <em>nas categorias disponíveis</em>, não uma medida de pertencimento. Matrículas sem declaração ficam fora do percentual e são mostradas à parte.
+            <span id="notaRaca"></span> A declaração é feita pelo aluno ou responsável no ato da matrícula, com as categorias do IBGE. O Censo Escolar não tem categoria "quilombola" para cor/raça. Por isso o que se vê aqui é como a população quilombola aparece <em>nas categorias disponíveis</em>, não uma medida de pertencimento. Matrículas sem declaração ficam fora do percentual e são mostradas à parte.
         </div>
     </div>
 </section>
@@ -452,7 +454,7 @@
         </div>
         <div class="caixa-aviso" style="margin-top:14px;">
             <strong>Cuidado na leitura</strong>
-            Correlação não é causa: duas variáveis podem subir juntas por efeito de uma terceira (o porte do município, por exemplo). Com poucos pontos, um único município atípico move a reta inteira — por isso o filtro de mínimo de escolas por ponto. Variáveis do tipo sim/não viram <em>percentual de escolas com o item</em> quando o ponto é município ou UF; na unidade “uma escola” elas valem 0 ou 1, o que empilha os pontos em duas linhas e torna a reta pouco informativa.
+            Correlação não é causa: duas variáveis podem subir juntas por efeito de uma terceira (o porte do município, por exemplo). Com poucos pontos, um único município atípico move a reta inteira, e é para isso que serve o filtro de mínimo de escolas por ponto. Variáveis do tipo sim/não viram <em>percentual de escolas com o item</em> quando o ponto é município ou UF; na unidade “uma escola” elas valem 0 ou 1, o que empilha os pontos em duas linhas e torna a reta pouco informativa.
         </div>
     </div>
 </section>
@@ -557,7 +559,7 @@
         <div class="construtor-caixa">
             <div class="construtor-controles">
                 <div class="campo"><label for="cruzA">Variável A (linhas / eixo)</label><select id="cruzA"></select></div>
-                <div class="campo"><label for="cruzB">Variável B (cruzar com — opcional)</label><select id="cruzB"></select></div>
+                <div class="campo"><label for="cruzB">Variável B (cruzar com, opcional)</label><select id="cruzB"></select></div>
                 <div class="campo"><label for="cruzModo">Medida</label>
                     <select id="cruzModo">
                         <option value="contagem">Nº de escolas</option>
@@ -599,24 +601,24 @@
         </div>
         <div class="fontes-grid">
             <div class="fontes-texto">
-                <p><strong>De onde vêm os dados.</strong> Os microdados do Censo Escolar da Educação Básica (__ANO_CENSO__) são produzidos pelo INEP e são públicos. Este painel cruza três tabelas do Censo pelo código da escola: a tabela <em>Escola</em>, de onde vêm infraestrutura, dependência e localização; a tabela <em>Turma</em>, de onde vêm as turmas efetivamente abertas, inclusive as de EJA; e a tabela <em>Matrícula</em>, de onde vêm os alunos — cor/raça, sexo, turno, faixa etária e transporte escolar. As três dizem coisas diferentes: a primeira, que a modalidade existe; a segunda, quantas turmas; a terceira, quantos alunos. O recorte é o de localização diferenciada (TP_LOCALIZACAO_DIFERENCIADA), categoria declarada pela própria escola: além da comunidade quilombola (código 3), o painel carrega terra indígena, área de assentamento e demais povos e comunidades tradicionais, para permitir a comparação.</p>
+                <p><strong>De onde vêm os dados.</strong> Os microdados do Censo Escolar da Educação Básica (__ANO_CENSO__) são produzidos pelo INEP e são públicos. Este painel cruza três tabelas do Censo pelo código da escola: a tabela <em>Escola</em>, de onde vêm infraestrutura, dependência e localização; a tabela <em>Turma</em>, de onde vêm as turmas efetivamente abertas, inclusive as de EJA; e a tabela <em>Matrícula</em>, de onde vêm os alunos, com cor/raça, sexo, turno, faixa etária e transporte escolar. As três dizem coisas diferentes: a primeira, que a modalidade existe; a segunda, quantas turmas; a terceira, quantos alunos. O recorte é o de localização diferenciada (TP_LOCALIZACAO_DIFERENCIADA), categoria declarada pela própria escola: além da comunidade quilombola (código 3), o painel carrega terra indígena, área de assentamento e demais povos e comunidades tradicionais, para permitir a comparação.</p>
                 <p><strong>Como esta página foi feita.</strong> Ela foi gerada a partir __ARQUIVOS_FONTE__ da página de microdados do INEP, em __DATA_GERACAO__. Não há atualização automática nem banco de dados: quem mantém o painel baixa os microdados do ano, roda o script de geração e publica o arquivo que sai. O Censo é anual, então a base muda uma vez por ano.</p>
                 <ul>
                     <li>Consulte os microdados oficiais do Censo Escolar na página do INEP, ao lado.</li>
-                    <li>Baixe os dados desta página em CSV ou JSON — a seleção filtrada ou a base completa com os nomes de coluna do INEP.</li>
+                    <li>Baixe os dados desta página em CSV ou JSON: a seleção filtrada ou a base completa com os nomes de coluna do INEP.</li>
                     <li>Confira qualquer número recalculando a partir dos microdados originais: nada aqui é estimativa.</li>
                 </ul>
                 <div class="caixa-aviso">
                     <strong>Limitações conhecidas</strong>
-                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais — por isso alguns “n” variam entre indicadores. <strong>Nem toda escola declara coordenada</strong>, e a cobertura varia bastante entre os territórios; as que não declaram entram no mapa agrupadas por município. A <strong>localidade</strong> mostrada nos pontos do mapa e na tabela é o campo de endereço do Censo. Em escola quilombola rural ele quase nunca é endereço postal: em 54% dos casos nomeia a comunidade ou o povoado, em 23% um lugar (rio, lago, igarapé, ramal) e em 15% uma rua ou rodovia — só 4% trazem número. É a única pista de território que o Censo oferece abaixo do município, e por isso vale lida como indicação, não como endereço. Número, complemento, bairro, CEP e telefone existem na base de origem e não são republicados. O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola, e há comunidades sem escola alguma — estas, por definição, não aparecem aqui. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
+                    Os campos do Censo são binários (0 = não, 1 = sim); registros sem declaração (“*”) são tratados como “sem dado” e excluídos do denominador dos percentuais, e por isso alguns “n” variam entre indicadores. <strong>Nem toda escola declara coordenada</strong>, e a cobertura varia bastante entre os territórios; as que não declaram entram no mapa agrupadas por município. A <strong>localidade</strong> mostrada nos pontos do mapa e na tabela é o campo de endereço do Censo. Em escola quilombola rural ele quase nunca é endereço postal: em 54% dos casos nomeia a comunidade ou o povoado, em 23% um lugar (rio, lago, igarapé, ramal) e em 15% uma rua ou rodovia, e só 4% trazem número. É a única pista de território que o Censo oferece abaixo do município, e por isso vale lida como indicação, não como endereço. Número, complemento, bairro, CEP e telefone existem na base de origem e não são republicados. O painel conta <em>escolas</em>, não comunidades: um mesmo território quilombola pode ter mais de uma escola, e há comunidades sem escola alguma, que por definição não aparecem aqui. A informação reflete o que cada escola declarou no ano do Censo; ausência de declaração não significa ausência do serviço.
                 </div>
             </div>
             <div class="cartao-fonte">
                 <h3>Baixar e conferir</h3>
-                <a class="link-fonte" href="__LINK_INEP__" target="_blank" rel="noopener">↗ Microdados do Censo Escolar — INEP</a>
-                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-indicadores/censo-escolar" target="_blank" rel="noopener">↗ Censo Escolar — página oficial</a>
+                <a class="link-fonte" href="__LINK_INEP__" target="_blank" rel="noopener">↗ Microdados do Censo Escolar (INEP)</a>
+                <a class="link-fonte" href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-indicadores/censo-escolar" target="_blank" rel="noopener">↗ Página oficial do Censo Escolar</a>
                 <div class="separador"></div>
-                <p style="font-size:13px;margin-bottom:12px;">Os botões abaixo baixam a base inteira carregada nesta página, com os nomes de coluna do INEP. Para a seleção filtrada, use os botões na seção <a href="#tabela" style="color:var(--verde)">Relação das escolas</a>.</p>
+                <p style="font-size:14px;margin-bottom:12px;">Os botões abaixo baixam a base inteira carregada nesta página, com os nomes de coluna do INEP. Para a seleção filtrada, use os botões na seção <a href="#tabela" style="color:var(--verde)">Relação das escolas</a>.</p>
                 <div class="lista-download">
                     <button id="btnBaixarTudoCSV">Base completa em CSV (colunas do INEP)</button>
                     <button id="btnBaixarTudoJSON">Base completa em JSON</button>
@@ -640,9 +642,9 @@
         </div>
         <div>
             <strong>Dados</strong>
-            <p>Microdados do Censo Escolar da Educação Básica (INEP) — recorte de escolas em comunidades quilombolas.</p>
+            <p>Microdados do Censo Escolar da Educação Básica (INEP), no recorte de escolas em comunidades quilombolas.</p>
         </div>
-        <div class="assinatura">Painel adaptado do <a href="https://raizamedados.vercel.app/" target="_blank" rel="noopener">Raizame Dados — Comunidades Quilombolas Certificadas (base FCP)</a> · Gerado a partir dos microdados do Censo Escolar __ANO_CENSO__ (INEP) em __DATA_GERACAO__ · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
+        <div class="assinatura">Painel adaptado do <a href="https://raizamedados.vercel.app/" target="_blank" rel="noopener">Raizame Dados · Comunidades Quilombolas Certificadas (base FCP)</a> · Gerado a partir dos microdados do Censo Escolar __ANO_CENSO__ (INEP) em __DATA_GERACAO__ · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
     </div>
 </footer>
 
@@ -988,7 +990,7 @@ function renderPontos(){
     const cor = Object.entries(cont).sort((a,b)=>b[1]-a[1])[0][0];
     const m = L.circleMarker([r0.lat,r0.lon],{radius:raio(grupo.length),weight:1.5,
       color:cor,fillColor:cor,fillOpacity:.45});
-    m.bindTooltip(`${esc(r0.municipio)} (${esc(r0.uf)}) — ${fmt(grupo.length)} escola(s)`, {className:'ponto-tooltip'});
+    m.bindTooltip(`${esc(r0.municipio)} (${esc(r0.uf)}) · ${fmt(grupo.length)} escola(s)`, {className:'ponto-tooltip'});
     m.bindPopup(()=>popupMunicipio(grupo), {maxWidth:340});
     camadaPontos.addLayer(m);
   });
@@ -1075,7 +1077,7 @@ function renderEtapas(){
   // a divisão anos iniciais / anos finais é frágil onde há turma multisseriada
   const comFund = visiveis.filter(r=>r.multisseriada!=null).length;
   const ms = visiveis.filter(r=>r.multisseriada===1).length;
-  $('notaEtapas').innerHTML = 'A etapa conta como ofertada quando a escola abriu ao menos uma turma dela no ano do Censo — ' +
+  $('notaEtapas').innerHTML = 'A etapa conta como ofertada quando a escola abriu ao menos uma turma dela no ano do Censo, ' +
     'e não pelo campo de educação especial, que uma versão anterior deste painel usava por engano. ' +
     (comFund ? `No recorte atual, <strong>${fmt(ms)} de ${fmt(comFund)} escolas com ensino fundamental (${(100*ms/comFund).toFixed(0)}%) têm turma multisseriada</strong>. ` +
       'Nesses casos o Censo costuma lançar a turma inteira nos anos finais, então uma escola que ensina do 1º ao 9º ano pode aparecer só em “anos finais”. ' +
@@ -1415,8 +1417,8 @@ function renderEja(){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom',labels:{boxWidth:12}},
         tooltip:{callbacks:{label:ctx=>{const p=porTipo[ctx.dataIndex];
-          return ctx.datasetIndex===0 ? ` ${ctx.parsed.y.toFixed(1).replace('.',',')}% — ${fmt(p.com)} de ${fmt(p.escolas)} escolas`
-            : ` ${ctx.parsed.y==null?'sem dado':ctx.parsed.y.toFixed(1).replace('.',',')+'%'} — ${fmt(p.turmas)} de ${fmt(p.tot)} turmas`;}}}},
+          return ctx.datasetIndex===0 ? ` ${ctx.parsed.y.toFixed(1).replace('.',',')}% · ${fmt(p.com)} de ${fmt(p.escolas)} escolas`
+            : ` ${ctx.parsed.y==null?'sem dado':ctx.parsed.y.toFixed(1).replace('.',',')+'%'} · ${fmt(p.turmas)} de ${fmt(p.tot)} turmas`;}}}},
       scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}}}}});
 
   const turnos = [['turEjaFundAI','Fund. anos iniciais'],['turEjaFundAF','Fund. anos finais'],
@@ -1437,7 +1439,7 @@ function renderEja(){
   const resto = turmas - etapasSoma;
   $('notaEja').textContent = `No recorte atual, ${fmt(comEja.length)} de ${fmt(visiveis.length)} escola(s) têm ao menos uma turma de EJA, somando ${fmt(turmas)} turma(s). ` +
     `As três primeiras barras do gráfico ao lado são etapas e somam ${fmt(etapasSoma)}` +
-    (resto > 0 ? ` — as ${fmt(resto)} turmas restantes são de cursos FIC e técnicos integrados à EJA, que o Censo conta no total mas não nessas etapas.` : '.') +
+    (resto > 0 ? `. As ${fmt(resto)} turmas restantes são de cursos FIC e técnicos integrados à EJA, que o Censo conta no total mas não nessas etapas.` : '.') +
     ` As barras entre parênteses são recortes de turno e modalidade das mesmas turmas: somam o total, mas não devem ser somadas às etapas.`;
 }
 
@@ -1468,7 +1470,7 @@ function renderTabela(){
   const ini=(pagina-1)*porPagina, corte=lista.slice(ini,ini+porPagina);
   $('tabelaCorpo').innerHTML = corte.length ? corte.map(r=>`<tr>
       <td><strong>${esc(r.escola)}</strong>` +
-      (r.localidade ? `<br><span style="color:var(--dourado);font-size:12px">${esc(r.localidade)}</span>` : '') +
+      (r.localidade ? `<br><span style="color:var(--dourado);font-size:13px">${esc(r.localidade)}</span>` : '') +
       `<br><span class="celula-vazia">cód. ${esc(r.cod||'—')}</span></td>
       <td><span class="chip-etapa" style="border-color:${CORES_TIPO[r.locDif]||'#D9CBAC'}">${esc(TIPOS_CURTO[r.locDif]||'—')}</span></td>
       <td>${esc(r.municipio||'—')}</td><td>${esc(r.uf||'—')}</td>
@@ -1581,7 +1583,7 @@ function renderCruzador(){
     'Só dá para empilhar contagens e somas, em que as partes formam um total. Percentuais e médias são taxas de grupos diferentes.';
   ultimoCruzamento = {aRot:a.rot, series, cats, cel, modo};
   $('notaCruzador').textContent = (b?`Cruzamento de "${a.rot}" por "${b.rot}"`:`Distribuição por "${a.rot}"`)
-    + ` — ${fmt(arr.length)} escolas no recorte atual.`
+    + ` · ${fmt(arr.length)} escolas no recorte atual.`
     + (cats.length>cap?` O gráfico mostra as ${cap} primeiras linhas; a tabela traz tudo.`:'')
     + (modo==='pct'?` Percentual calculado sobre as escolas com dado para o indicador.`:'');
 }
@@ -1704,8 +1706,9 @@ function ligaEventos(){
   $('btnBaixarCorrelacao').addEventListener('click',baixaCorrelacao);
 }
 
-Chart.defaults.font.family = "'Inter',sans-serif";
+Chart.defaults.font.family = "'Times New Roman',Times,'Liberation Serif',serif";
 Chart.defaults.color = '#4A4033';
+Chart.defaults.font.size = 13;   /* Times pede 1px a mais que a sans para a mesma leitura */
 Chart.defaults.borderColor = '#E4DAC6';
 populaFiltros();
 ligaEventos();
