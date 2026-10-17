@@ -890,11 +890,10 @@ let mapa, camadaPontos;
 function initMapa(){
   mapa = L.map('mapa', {preferCanvas:true, minZoom:3}).setView([-10.8,-52.9],4);
   const bases = {
-    'Claro': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap &middot; &copy; CARTO'}),
     'Ruas': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}),
     'Satélite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagens &copy; Esri'}),
     'Relevo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; OpenTopoMap (CC-BY-SA)'})};
-  bases['Claro'].addTo(mapa);
+  bases['Ruas'].addTo(mapa);
   L.control.layers(bases, null, {position:'topright', collapsed:false}).addTo(mapa);
   L.control.scale({imperial:false}).addTo(mapa);
   camadaPontos = L.featureGroup().addTo(mapa);   // featureGroup: só ele tem getBounds()

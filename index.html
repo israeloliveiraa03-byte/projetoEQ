@@ -202,7 +202,7 @@
             </div>
         </div>
         <div class="header-meta">
-            <span><strong>Página gerada em:</strong> 25/09/2026</span>
+            <span><strong>Página gerada em:</strong> 17/10/2026</span>
             <span><strong>Fonte:</strong> microdados do Censo Escolar 2025 (INEP)</span>
             <span><strong>Escolas quilombolas:</strong> 2.737 · 699 municípios · 24 UF</span>
             <span><strong>Base para comparação:</strong> 12.472 escolas em território diferenciado · 1.732 municípios · 27 UF</span>
@@ -602,7 +602,7 @@
         <div class="fontes-grid">
             <div class="fontes-texto">
                 <p><strong>De onde vêm os dados.</strong> Os microdados do Censo Escolar da Educação Básica (2025) são produzidos pelo INEP e são públicos. Este painel cruza três tabelas do Censo pelo código da escola: a tabela <em>Escola</em>, de onde vêm infraestrutura, dependência e localização; a tabela <em>Turma</em>, de onde vêm as turmas efetivamente abertas, inclusive as de EJA; e a tabela <em>Matrícula</em>, de onde vêm os alunos, com cor/raça, sexo, turno, faixa etária e transporte escolar. As três dizem coisas diferentes: a primeira, que a modalidade existe; a segunda, quantas turmas; a terceira, quantos alunos. O recorte é o de localização diferenciada (TP_LOCALIZACAO_DIFERENCIADA), categoria declarada pela própria escola: além da comunidade quilombola (código 3), o painel carrega terra indígena, área de assentamento e demais povos e comunidades tradicionais, para permitir a comparação.</p>
-                <p><strong>Como esta página foi feita.</strong> Ela foi gerada a partir dos arquivos Tabela_Escola_2025.csv, Tabela_Turma_2025_V2.csv e Tabela_Matricula_2025_V2.csv, baixados da página de microdados do INEP, em 25/09/2026. Não há atualização automática nem banco de dados: quem mantém o painel baixa os microdados do ano, roda o script de geração e publica o arquivo que sai. O Censo é anual, então a base muda uma vez por ano.</p>
+                <p><strong>Como esta página foi feita.</strong> Ela foi gerada a partir dos arquivos Tabela_Escola_2025.csv, Tabela_Turma_2025_V2.csv e Tabela_Matricula_2025_V2.csv, baixados da página de microdados do INEP, em 17/10/2026. Não há atualização automática nem banco de dados: quem mantém o painel baixa os microdados do ano, roda o script de geração e publica o arquivo que sai. O Censo é anual, então a base muda uma vez por ano.</p>
                 <ul>
                     <li>Consulte os microdados oficiais do Censo Escolar na página do INEP, ao lado.</li>
                     <li>Baixe os dados desta página em CSV ou JSON: a seleção filtrada ou a base completa com os nomes de coluna do INEP.</li>
@@ -644,7 +644,7 @@
             <strong>Dados</strong>
             <p>Microdados do Censo Escolar da Educação Básica (INEP), no recorte de escolas em comunidades quilombolas.</p>
         </div>
-        <div class="assinatura">Painel adaptado do <a href="https://raizamedados.vercel.app/" target="_blank" rel="noopener">Raizame Dados · Comunidades Quilombolas Certificadas (base FCP)</a> · Gerado a partir dos microdados do Censo Escolar 2025 (INEP) em 25/09/2026 · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
+        <div class="assinatura">Painel adaptado do <a href="https://raizamedados.vercel.app/" target="_blank" rel="noopener">Raizame Dados · Comunidades Quilombolas Certificadas (base FCP)</a> · Gerado a partir dos microdados do Censo Escolar 2025 (INEP) em 17/10/2026 · Arquivo único, sem servidor: pode ser guardado, copiado e aberto sem internet (o mapa e os gráficos precisam de conexão na primeira abertura)</div>
     </div>
 </footer>
 
@@ -890,11 +890,10 @@ let mapa, camadaPontos;
 function initMapa(){
   mapa = L.map('mapa', {preferCanvas:true, minZoom:3}).setView([-10.8,-52.9],4);
   const bases = {
-    'Claro': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap &middot; &copy; CARTO'}),
     'Ruas': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}),
     'Satélite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagens &copy; Esri'}),
     'Relevo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; OpenTopoMap (CC-BY-SA)'})};
-  bases['Claro'].addTo(mapa);
+  bases['Ruas'].addTo(mapa);
   L.control.layers(bases, null, {position:'topright', collapsed:false}).addTo(mapa);
   L.control.scale({imperial:false}).addTo(mapa);
   camadaPontos = L.featureGroup().addTo(mapa);   // featureGroup: só ele tem getBounds()
